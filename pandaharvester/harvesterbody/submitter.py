@@ -13,9 +13,10 @@ from pandaharvester.harvestercore.plugin_factory import PluginFactory
 from pandaharvester.harvesterbody.agent_base import AgentBase
 from pandaharvester.harvesterbody.worker_maker import WorkerMaker
 from pandaharvester.harvesterbody.worker_adjuster import WorkerAdjuster
-from pandaharvester.harvestercore.pilot_errors import PilotErrors
 from pandaharvester.harvestercore.fifos import MonitorFIFO
 from pandaharvester.harvestermisc.apfmon import Apfmon
+
+from pilot.common.errorcodes import ErrorCodes
 
 # logger
 _logger = core_utils.setup_logger('submitter')
@@ -212,7 +213,7 @@ class Submitter(AgentBase):
                                             jobSpec.stateChangeTime = timeNow
                                             jobSpec.lockedBy = None
                                             errStr = 'failed to make a worker'
-                                            jobSpec.set_pilot_error(PilotErrors.ERR_SETUPFAILURE, errStr)
+                                            jobSpec.set_pilot_error(ErrorCodes.SETUPFAILURE, errStr)
                                             jobSpec.trigger_propagation()
                                             self.dbProxy.update_job(jobSpec, {'lockedBy': lockedBy,
                                                                               'subStatus': 'prepared'})
@@ -312,7 +313,7 @@ class Submitter(AgentBase):
                                             tmpLog.error(errStr)
                                             workSpec.set_status(WorkSpec.ST_missed)
                                             workSpec.set_dialog_message(tmpStr)
-                                            workSpec.set_pilot_error(PilotErrors.ERR_SETUPFAILURE, errStr)
+                                            workSpec.set_pilot_error(ErrorCodes.SETUPFAILURE, errStr)
                                             if jobList is not None:
                                                 # increment attempt number
                                                 newJobList = []

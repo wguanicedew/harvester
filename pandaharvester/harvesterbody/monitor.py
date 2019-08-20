@@ -11,9 +11,10 @@ from pandaharvester.harvestercore.db_proxy_pool import DBProxyPool as DBProxy
 from pandaharvester.harvestercore.work_spec import WorkSpec
 from pandaharvester.harvestercore.plugin_factory import PluginFactory
 from pandaharvester.harvesterbody.agent_base import AgentBase
-from pandaharvester.harvestercore.pilot_errors import PilotErrors
 from pandaharvester.harvestercore.fifos import MonitorFIFO, MonitorEventFIFO
 from pandaharvester.harvestermisc.apfmon import Apfmon
+
+from pilot.common.errorcodes import ErrorCodes
 
 # logger
 _logger = core_utils.setup_logger('monitor')
@@ -375,10 +376,10 @@ class Monitor(AgentBase):
                     isCheckedList.append(isChecked)
                     if monStatus == WorkSpec.ST_failed:
                         if not workSpec.has_pilot_error():
-                            workSpec.set_pilot_error(PilotErrors.ERR_GENERALERROR, diagMessage)
+                            workSpec.set_pilot_error(ErrorCodes.GENERALERROR, diagMessage)
                     elif monStatus == WorkSpec.ST_cancelled:
                         if not workSpec.has_pilot_error():
-                            workSpec.set_pilot_error(PilotErrors.ERR_PANDAKILL, diagMessage)
+                            workSpec.set_pilot_error(ErrorCodes.PANDAKILL, diagMessage)
                     if monStatus in [WorkSpec.ST_finished, WorkSpec.ST_failed, WorkSpec.ST_cancelled]:
                         workSpec.set_work_params({'finalMonStatus': monStatus})
                     # request events
@@ -630,7 +631,7 @@ class Monitor(AgentBase):
                             self.dbProxy.kill_worker(workSpec.workerID)
                             newStatus = WorkSpec.ST_cancelled
                             diagMessage = 'Killed by Harvester due to consecutive worker check failures. ' + diagMessage
-                            workSpec.set_pilot_error(PilotErrors.ERR_FAILEDBYSERVER, diagMessage)
+                            workSpec.set_pilot_error(ErrorCodes.FAILEDBYSERVER, diagMessage)
                         else:
                             # use original status
                             newStatus = workSpec.status
@@ -645,7 +646,7 @@ class Monitor(AgentBase):
                                         workerID, workerQueueTimeLimit))
                         self.dbProxy.kill_worker(workSpec.workerID)
                         diagMessage = 'Killed by Harvester due to worker queuing too long' + diagMessage
-                        workSpec.set_pilot_error(PilotErrors.ERR_FAILEDBYSERVER, diagMessage)
+                        workSpec.set_pilot_error(ErrorCodes.FAILEDBYSERVER, diagMessage)
                     # expired heartbeat - only when requested in the configuration
                     try:
                         # check if the queue configuration requires checking for worker heartbeat
@@ -663,7 +664,7 @@ class Monitor(AgentBase):
                                 workerID))
                             self.dbProxy.kill_worker(workSpec.workerID)
                             diagMessage = 'Killed by Harvester due to worker heartbeat expired. ' + diagMessage
-                            workSpec.set_pilot_error(PilotErrors.ERR_FAILEDBYSERVER, diagMessage)
+                            workSpec.set_pilot_error(ErrorCodes.FAILEDBYSERVER, diagMessage)
                     # get work attributes
                     workAttributes = messenger.get_work_attributes(workSpec)
                     retMap[workerID]['workAttributes'] = workAttributes

@@ -31,7 +31,7 @@ setup(
                       'futures; python_version == "2.*"',
                       'pycryptodomex',
                       'panda-common-s >= 0.0.11',
-                      'pilot2 >= 2.1.21.17',
+                      'panda-pilot',
                       'pyjwt',
                       'subprocess32; python_version == "2.*"',
                       'rpyc',

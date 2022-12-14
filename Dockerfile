@@ -70,7 +70,8 @@ RUN mkdir -p /var/log/panda/mariadb
 RUN chmod -R 777 /var/log/panda/mariadb
 RUN mv /etc/my.cnf /etc/my.cnf.back
 COPY docker/my.cnf /etc/
-COPY docker/init_mariadb.sh /data/harvester/ && chmod a+x /data/harvester/init_mariadb.sh
+COPY docker/init_mariadb.sh /opt/
+RUN chmod 777 /opt/init_mariadb.sh
 
 # make lock dir
 ENV PANDA_LOCK_DIR /var/run/panda
@@ -81,7 +82,7 @@ RUN echo $'#!/bin/bash \n\
 set -m \n\
 mkdir -p /var/log/panda/mariadb \n\
 chmod -R 777 /var/log/panda/mariadb \n\
-/data/harvester/init_mariadb.sh \n\
+/opt/init_mariadb.sh \n\
 /data/harvester/init-harvester \n\
 /data/harvester/run-harvester-crons & \n\
 source /data/harvester/setup-harvester \n\

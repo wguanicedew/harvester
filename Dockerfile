@@ -2,7 +2,7 @@ FROM docker.io/centos:7
 
 RUN yum update -y
 RUN yum install -y epel-release
-RUN yum install -y python3 python3-devel gcc less git mysql-devel curl mariadb voms-clients-cpp wget httpd
+RUN yum install -y python3 python3-devel gcc less git mysql-devel curl mariadb mariadb-server voms-clients-cpp wget httpd
 
 RUN mkdir -p /data/condor; cd /data/condor; \
     curl -fsSL https://get.htcondor.org | /bin/bash -s -- --download --channel stable; \
@@ -62,6 +62,13 @@ RUN chmod -R 777 /var/log/httpd
 RUN mkdir -p /opt/harvester/etc/queue_config && chmod 777 /opt/harvester/etc/queue_config
 COPY docker/httpd.conf /etc/httpd/conf/
 
+# set directory for mysql
+RUN mkdir -p /var/log/panda/mariadb
+RUN chmod -R 777 /var/log/panda/mariadb
+RUN mv /etc/my.cnf /etc/my.cnf.back
+COPY docker/my.cnf /etc/
+COPY docker/init_mariadb.sh /data/harvester/ && chmod a+x /data/harvester/init_mariadb.sh
+
 # make lock dir
 ENV PANDA_LOCK_DIR /var/run/panda
 RUN mkdir -p ${PANDA_LOCK_DIR} && chmod 777 ${PANDA_LOCK_DIR}
@@ -69,6 +76,9 @@ RUN mkdir -p ${PANDA_LOCK_DIR} && chmod 777 ${PANDA_LOCK_DIR}
 # make a wrapper script to launch services and periodic jobs in non-root container
 RUN echo $'#!/bin/bash \n\
 set -m \n\
+mkdir -p /var/log/panda/mariadb \n\
+chmod -R 777 /var/log/panda/mariadb \n\
+/data/harvester/init_mariadb.sh \n\
 /data/harvester/init-harvester \n\
 /data/harvester/run-harvester-crons & \n\
 source /data/harvester/setup-harvester \n\

@@ -2,13 +2,15 @@ FROM docker.io/centos:7
 
 RUN yum update -y
 RUN yum install -y epel-release
-RUN yum install -y python3 python3-devel gcc less git mysql-devel curl mariadb mariadb-server voms-clients-cpp wget httpd
+RUN yum install -y python3 python3-devel gcc less git mysql-devel curl mariadb mariadb-server voms-clients-cpp wget httpd logrotate
 
 RUN mkdir -p /data/condor; cd /data/condor; \
+    wget https://research.cs.wisc.edu/htcondor/tarball/9.0/9.0.17/release/condor-9.0.17-x86_64_CentOS7-stripped.tar.gz -O condor.tar.gz.9; \
     curl -fsSL https://get.htcondor.org | /bin/bash -s -- --download --channel stable; \
     mv condor.tar.gz condor.tar.gz.stable; \
-    curl -fsSL https://get.htcondor.org | /bin/bash -s -- --download
-
+    curl -fsSL https://get.htcondor.org | /bin/bash -s -- --download; \
+    ln -fs condor.tar.gz condor.tar.gz.latest
+    
 #install gcloud
 RUN echo $'[google-cloud-cli] \n\
 name=Google Cloud CLI \n\
@@ -59,6 +61,7 @@ RUN chmod -R 777 /data/harvester
 RUN chmod -R 777 /data/condor
 RUN chmod -R 777 /etc/httpd
 RUN chmod -R 777 /var/log/httpd
+RUN chmod -R 777 /var/lib/logrotate
 RUN mkdir -p /opt/harvester/etc/queue_config && chmod 777 /opt/harvester/etc/queue_config
 COPY docker/httpd.conf /etc/httpd/conf/
 
@@ -94,6 +97,9 @@ condor_master \n\
 /opt/harvester/etc/rc.d/init.d/panda_harvester-uwsgi start \n ' > /opt/harvester/etc/rc.d/init.d/run-harvester-services
 
 RUN chmod +x /opt/harvester/etc/rc.d/init.d/run-harvester-services
+
+# add condor setup ins sysconfig
+RUN echo source /data/condor/condor/condor.sh >> /opt/harvester/etc/sysconfig/panda_harvester
 
 CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"
 

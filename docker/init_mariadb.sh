@@ -1,7 +1,7 @@
 #!/bin/bash
 
-RUN mkdir -p /var/log/panda/mariadb
-RUN chmod -R 777 /var/log/panda/mariadb
+mkdir -p /var/log/panda/mariadb
+chmod -R 777 /var/log/panda/mariadb
 
 
 _datadir() {

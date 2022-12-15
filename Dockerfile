@@ -68,6 +68,7 @@ COPY docker/httpd.conf /etc/httpd/conf/
 # set directory for mysql
 RUN mkdir -p /var/log/panda/mariadb
 RUN chmod -R 777 /var/log/panda/mariadb
+RUN chmod -R 777 /var/lib/mysql/
 RUN mv /etc/my.cnf /etc/my.cnf.back
 COPY docker/my.cnf /etc/
 COPY docker/init_mariadb.sh /data/harvester

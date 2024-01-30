@@ -21,7 +21,7 @@ repo_gpgcheck=0 \n\
 gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg \n\
        https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg \n ' > /etc/yum.repos.d/google-cloud-sdk.repo
 
-RUN yum install -y google-cloud-sdk-gke-gcloud-auth-plugin kubectl
+# RUN yum install -y google-cloud-sdk-gke-gcloud-auth-plugin kubectl
 
 # install voms
 RUN yum install -y https://repo.opensciencegrid.org/osg/3.6/el7/release/x86_64/osg-ca-certs-1.109-1.osg36.el7.noarch.rpm

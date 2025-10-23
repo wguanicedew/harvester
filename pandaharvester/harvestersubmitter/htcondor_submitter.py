@@ -219,12 +219,20 @@ def make_a_jdl(
             tmpLog.debug(f"job attributes override by CRIC special_par: {attr}={str(_match.group(1))}")
     # derived job attributes
     n_core_total_factor = n_core_total * n_core_factor
-    n_node = ceil(n_core_total / n_core_per_node)
+
+    n_node = getattr(self, "nNode", None)
+    if not n_node:
+        n_node = ceil(n_core_total / n_core_per_node)
+    max_request_ram = getattr(self, "maxRequestRam", None)
+    if request_ram > max_request_ram:
+        request_ram = max_request_ram
+        logger.info(f"request_ram {request_ram} > max_request_ram {max_request_ram}, set it to max_request_ram")
+
     request_ram_factor = request_ram * n_core_factor
     request_ram_bytes = request_ram * 2**20
     request_ram_bytes_factor = request_ram * 2**20 * n_core_factor
-    request_ram_per_core = ceil(request_ram * n_node / n_core_total)
-    request_ram_bytes_per_core = ceil(request_ram_bytes * n_node / n_core_total)
+    request_ram_per_core = ceil(request_ram / n_core_total)
+    request_ram_bytes_per_core = ceil(request_ram_bytes / n_core_total)
     request_cputime = request_walltime * n_core_total
     request_walltime_minute = ceil(request_walltime / 60)
     request_cputime_minute = ceil(request_cputime / 60)

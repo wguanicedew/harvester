@@ -182,6 +182,8 @@ def make_a_jdl(
     is_gpu_resource=False,
     n_core_factor=1,
     custom_submit_attr_dict=None,
+    n_node=1,
+    max_request_ram=None,
     **kwarg,
 ):
     """
@@ -220,13 +222,9 @@ def make_a_jdl(
     # derived job attributes
     n_core_total_factor = n_core_total * n_core_factor
 
-    n_node = getattr(self, "nNode", None)
-    if not n_node:
-        n_node = ceil(n_core_total / n_core_per_node)
-    max_request_ram = getattr(self, "maxRequestRam", None)
     if request_ram > max_request_ram:
         request_ram = max_request_ram
-        logger.info(f"request_ram {request_ram} > max_request_ram {max_request_ram}, set it to max_request_ram")
+        tmpLog.info(f"request_ram {request_ram} > max_request_ram {max_request_ram}, set it to max_request_ram")
 
     request_ram_factor = request_ram * n_core_factor
     request_ram_bytes = request_ram * 2**20
@@ -679,6 +677,11 @@ class HTCondorSubmitter(PluginBase):
         except AttributeError:
             n_core_per_node = n_core_per_node_from_queue
 
+        n_node = getattr(self, "nNode", None)
+        if not n_node:
+            n_node = ceil(n_core_total / n_core_per_node)
+        max_request_ram = getattr(self, "maxRequestRam", None)
+
         # deal with Condor schedd and central managers; make a random list the choose
         n_bulks = ceil(nWorkers / self.minBulkToRandomizedSchedd)
         if isinstance(self.condorSchedd, list) and len(self.condorSchedd) > 0:
@@ -951,6 +954,8 @@ class HTCondorSubmitter(PluginBase):
                         "log_dir": self.logDir,
                         "log_subdir": log_subdir,
                         "n_core_per_node": n_core_per_node,
+                        "n_node": n_node,
+                        "max_request_ram": max_request_ram,
                         "n_core_factor": get_core_factor(workspec),
                         "panda_queue_name": panda_queue_name,
                         "x509_user_proxy": proxy,

@@ -224,8 +224,7 @@ def make_a_jdl(
     if n_node is None:
         n_node = ceil(n_core_total / n_core_per_node)
 
-    max_request_ram = getattr(self, "maxRequestRam", None)
-    if request_ram > max_request_ram:
+    if max_request_ram and request_ram > max_request_ram:
         request_ram = max_request_ram
         tmpLog.info(f"request_ram {request_ram} > max_request_ram {max_request_ram}, set it to max_request_ram")
 
@@ -612,9 +611,6 @@ class HTCondorSubmitter(PluginBase):
         if not n_core_per_node:
             n_core_per_node = n_core_per_node_from_queue
 
-        n_node = getattr(self, "nNode", None)
-        if not n_node:
-            n_node = ceil(n_core_total / n_core_per_node)
         max_request_ram = getattr(self, "maxRequestRam", None)
 
         # deal with Condor schedd and central managers; make a random list the choose

@@ -116,7 +116,7 @@ class SlurmSubmitter(PluginBase):
         if not n_node:
             n_node = ceil(n_core_total / n_core_per_node)
         max_request_ram = getattr(self, "maxRequestRam", None)
-        if request_ram > max_request_ram:
+        if max_request_ram and request_ram > max_request_ram:
             request_ram = max_request_ram
             logger.info(f"request_ram {request_ram} > max_request_ram {max_request_ram}, set it to max_request_ram")
 

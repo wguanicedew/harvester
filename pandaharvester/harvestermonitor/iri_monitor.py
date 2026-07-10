@@ -1,3 +1,5 @@
+import os
+
 from pandaharvester.harvestercore import core_utils
 from pandaharvester.harvestercore.plugin_base import PluginBase
 from pandaharvester.harvestercore.work_spec import WorkSpec
@@ -5,6 +7,9 @@ from pandaharvester.harvestermisc.iri_utils import IriClient, IriClientError
 
 # logger
 baseLogger = core_utils.setup_logger("iri_monitor")
+
+# statuses for which the remote job has stopped running and its output, if any, is ready
+_TERMINAL_STATUSES = (WorkSpec.ST_finished, WorkSpec.ST_failed, WorkSpec.ST_cancelled)
 
 
 # monitor for IRI API
@@ -15,6 +20,16 @@ class IriMonitor(PluginBase):
         self.iri_config = kwarg.get("iri_config")
         self.iri_resource_id = kwarg.get("iri_resource_id")
         self.iri_client = IriClient(config_path=self.iri_config, resource_id=self.iri_resource_id)
+
+        self.remote_export_path = kwarg.get("remote_export_path", None)
+        self.download_transfer_output_through_iri = not bool(self.remote_export_path)
+        self.htaccess_username = kwarg.get("htaccess_username", None)
+        htaccess_password_file = kwarg.get("htaccess_password", None)
+        if htaccess_password_file:
+            with open(htaccess_password_file) as f:
+                self.htaccess_password = f.read().strip()
+        else:
+            self.htaccess_password = None
 
     def check_workers(self, workspec_list):
         retList = []
@@ -48,5 +63,18 @@ class IriMonitor(PluginBase):
             else:
                 newStatus = WorkSpec.ST_failed
             tmpLog.debug(f"batchStatus {batchStatus} -> workerStatus {newStatus}")
+
+            if newStatus in _TERMINAL_STATUSES and not self.download_transfer_output_through_iri:
+                for filename in ("stdout.txt", "stderr.txt"):
+                    local_dest = os.path.join(workSpec.accessPoint, filename)
+                    if os.path.exists(local_dest):
+                        continue
+                    remote_url = f"{self.remote_export_path.rstrip('/')}/{workSpec.workerID}/{filename}"
+                    try:
+                        self.iri_client.download_from_http(remote_url, local_dest, username=self.htaccess_username, password=self.htaccess_password)
+                        tmpLog.debug(f"downloaded {filename} from {remote_url} to {local_dest}")
+                    except IriClientError as e:
+                        tmpLog.error(f"failed to download {filename} from {remote_url}: {e}")
+
             retList.append((newStatus, ""))
         return True, retList

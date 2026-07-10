@@ -19,6 +19,7 @@ import json as _json
 import os
 import shlex
 import sys
+import tarfile
 import time
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -147,6 +148,54 @@ class IriClient:
         self._curl("DELETE", url)
         resp = self._session.delete(url)
         return self._fetch(resp)
+
+    # ------------------------------------------------------------------
+    # Archive helpers
+    # ------------------------------------------------------------------
+
+    def create_input_archive(self, work_dir, input_list):
+        """Create a tar.gz archive of a job's input files.
+
+        Args:
+            work_dir: Working directory for the job (typically the worker's
+                access point). The archive is written here.
+            input_list: Paths of files to include (e.g. the X509 proxy,
+                token file, batch script, job data file). Missing or falsy
+                entries are skipped.
+
+        Returns:
+            Path to the created archive.
+        """
+        archive_path = os.path.join(work_dir, "input.tar.gz")
+        files = list(input_list)
+
+        with tarfile.open(archive_path, "w:gz") as tar:
+            for file_path in files:
+                if file_path and os.path.exists(file_path):
+                    tar.add(file_path, arcname=os.path.basename(file_path))
+        return archive_path
+
+    # ------------------------------------------------------------------
+    # HTTP export (htaccess/htpasswd)
+    # ------------------------------------------------------------------
+
+    def download_from_http(self, url, local_dest, *, username=None, password=None):
+        """Download a file from a plain HTTP(S) URL, such as a webserver export
+        directory protected by htaccess/htpasswd Basic authentication.
+
+        This does not go through the IRI API and does not use the client's
+        bearer token; it issues a direct HTTP GET with optional Basic auth.
+
+        Args:
+            url: Full URL of the remote file to download.
+            local_dest: Local destination path for the downloaded file.
+            username: htaccess Basic auth username. Omit for an unprotected URL.
+            password: htaccess Basic auth password (htpasswd).
+        """
+        auth = (username, password) if username is not None and password is not None else None
+        resp = requests.get(url, auth=auth, stream=True)
+        _raise_for_error(resp)
+        _stream_to_file(resp, local_dest)
 
     # ------------------------------------------------------------------
     # Filesystem

@@ -24,6 +24,7 @@ class IriSubmitter(PluginBase):
 
         self.pandaTokenFilename = getattr(self, "pandaTokenFilename", None)
         self.pandaTokenDir = getattr(self, "pandaTokenDir", None)
+        self.x509_proxy = getattr(self, "x509_proxy", None)
         
         self.remote_executable = kwarg.get("remote_executable", None)
         if not self.remote_executable:
@@ -32,6 +33,7 @@ class IriSubmitter(PluginBase):
         if not self.remote_work_dir:
             raise ValueError("remote_work_dir must be specified in iri_submitter configuration")
         self.remote_export_path = kwarg.get("remote_export_path", None)
+        self.htaccess_password = None
         if not self.remote_export_path:
             self.download_transfer_output_through_iri = True
         else:
@@ -40,16 +42,9 @@ class IriSubmitter(PluginBase):
             if htaccess_password_file:
                 with open(htaccess_password_file, "r") as f:
                     self.htaccess_password = f.read().strip()
-            else:
-                self.htaccess_password = None
 
         self.iri_client = IriClient(config_path=self.iri_config,
-                                    resource_id=self.iri_resource_id,
-                                    htaccess_password=self.htaccess_password,
-                                    remote_work_dir=self.remote_work_dir,
-                                    remote_export_path=self.remote_export_path,
-                                    download_transfer_output_through_iri=self.download_transfer_output_through_iri,
-                                    )
+                                    resource_id=self.iri_resource_id)
 
         if not hasattr(self, "localQueueName"):
             self.localQueueName = "debug"
@@ -80,15 +75,16 @@ class IriSubmitter(PluginBase):
             # make batch script, here we create batch script at where harvester install
             batchFile = self.make_batch_script(workSpec, tmpLog)
             placeholder = self.make_placeholder_map(workSpec, tmpLog)
+            remote_worker_dir = os.path.join(self.remote_work_dir, workSpec.workerID)
 
             job_spec = {
                 "executable": self.remote_executable,
                 "arguments": [batchFile],
-                "directory": os.path.join(self.remote_work_dir, workSpec.workerID),
+                "directory": remote_worker_dir,
                 "name": f"harvester-{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
-                "stdout_path": os.path.join(workSpec.accessPoint, "stdout"),
-                "stderr_path": os.path.join(workSpec.accessPoint, "stderr"),
+                "stdout_path": os.path.join(remote_worker_dir, "stdout.txt"),
+                "stderr_path": os.path.join(remote_worker_dir, "stderr.txt"),
                 "resources": {
                     "node_count": placeholder["nNode"],
                     "process_count": placeholder["nNode"],
@@ -107,8 +103,12 @@ class IriSubmitter(PluginBase):
             try:
                 if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
                     token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
-                    self.iri_client.upload_file(token_file, self.remote_work_dir)
-                
+                else:
+                    token_file = None
+                input_files = [batchFile, token_file, self.x509_proxy, os.path.join(workSpec.accessPoint, "pandaJobData.out")]
+                archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input_files)
+                remote_archive_path = os.path.join(remote_worker_dir, os.path.basename(archive_file))
+                self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
                 job = self.iri_client.launch_job(job_spec, resource_id=self.iri_resource_id)
             except IriClientError as e:
                 err = f"IRI job submission failed: {e}"

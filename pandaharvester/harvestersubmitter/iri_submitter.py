@@ -25,6 +25,9 @@ class IriSubmitter(PluginBase):
         self.pandaTokenFilename = getattr(self, "pandaTokenFilename", None)
         self.pandaTokenDir = getattr(self, "pandaTokenDir", None)
         self.x509_proxy = getattr(self, "x509_proxy", None)
+
+        self.templateFile = kwarg.get("templateFile", None)
+        self.remoteQueueName = kwarg.get("remoteQueueName", None)
         
         self.remote_executable = kwarg.get("remote_executable", None)
         if not self.remote_executable:
@@ -75,7 +78,7 @@ class IriSubmitter(PluginBase):
             # make batch script, here we create batch script at where harvester install
             batchFile = self.make_batch_script(workSpec, tmpLog)
             placeholder = self.make_placeholder_map(workSpec, tmpLog)
-            remote_worker_dir = os.path.join(self.remote_work_dir, workSpec.workerID)
+            remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
 
             job_spec = {
                 "executable": self.remote_executable,
@@ -94,7 +97,7 @@ class IriSubmitter(PluginBase):
                 },
                 "attributes": {
                     "duration": int(placeholder["requestWalltime"]) if placeholder["requestWalltime"] else None,
-                    "queue_name": self.localQueueName,
+                    "queue_name": self.remoteQueueName,
                     "account": getattr(self, "project", None),
                 },
                 "launcher": "single",

@@ -123,6 +123,15 @@ class IriSubmitter(PluginBase):
                 retList.append((False, err))
                 continue
 
+            remote_export_path = self.remote_export_path.rstrip("/") if self.remote_export_path else None
+            if remote_export_path:
+                rel_stdOut = f"{workSpec.workerID}/stdout.txt"
+                rel_stdErr = f"{workSpec.workerID}/stderr.txt"
+                log_stdOut = os.path.join(remote_export_path, rel_stdOut)
+                log_stdErr = os.path.join(remote_export_path, rel_stdErr)
+                workSpec.set_log_file("stdout", log_stdOut)
+                workSpec.set_log_file("stderr", log_stdErr)
+
             tmpLog.debug(f"Assigned batchID: {job_id}")
             workSpec.batchID = job_id
             retList.append((True, ""))

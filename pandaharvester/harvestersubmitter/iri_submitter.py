@@ -29,6 +29,7 @@ class IriSubmitter(PluginBase):
 
         self.templateFile = kwarg.get("templateFile", None)
         self.remoteQueueName = kwarg.get("remoteQueueName", None)
+        self.duration = kwarg.get("duration", None)
         
         self.remote_executable = kwarg.get("remote_executable", None)
         if not self.remote_executable:
@@ -81,6 +82,10 @@ class IriSubmitter(PluginBase):
             batchFile = self.make_batch_script(workSpec, tmpLog)
             placeholder = self.make_placeholder_map(workSpec, tmpLog)
             remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
+            if self.duration:
+                duration = self.duration
+            else:
+                duration = int(placeholder["requestWalltime"]) if placeholder["requestWalltime"] else None
 
             job_spec = {
                 "executable": self.remote_executable,
@@ -98,7 +103,7 @@ class IriSubmitter(PluginBase):
                     "memory": int(placeholder["requestRamBytes"]) if placeholder["requestRamBytes"] else None,
                 },
                 "attributes": {
-                    "duration": int(placeholder["requestWalltime"]) if placeholder["requestWalltime"] else None,
+                    "duration": int(duration) if duration else None,
                     "queue_name": self.remoteQueueName,
                     "account": getattr(self, "project", None),
                 },

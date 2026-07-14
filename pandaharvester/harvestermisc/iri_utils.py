@@ -153,26 +153,32 @@ class IriClient:
     # Archive helpers
     # ------------------------------------------------------------------
 
-    def create_input_archive(self, work_dir, input_list):
+    def create_input_archive(self, work_dir, inputs):
         """Create a tar.gz archive of a job's input files.
+        If the inputs is a dictionary, the keys are used as the names of the files in the archive.
+        If the inputs is a list, the files are added to the archive with their base names
 
         Args:
             work_dir: Working directory for the job (typically the worker's
                 access point). The archive is written here.
-            input_list: Paths of files to include (e.g. the X509 proxy,
-                token file, batch script, job data file). Missing or falsy
+            inputs: A dictionary mapping input names to their file paths or a list of file paths.
+                (e.g., the X509 proxy,token file, batch script, job data file). Missing or falsy
                 entries are skipped.
 
         Returns:
             Path to the created archive.
         """
         archive_path = os.path.join(work_dir, "input.tar.gz")
-        files = list(input_list)
 
         with tarfile.open(archive_path, "w:gz") as tar:
-            for file_path in files:
-                if file_path and os.path.exists(file_path):
-                    tar.add(file_path, arcname=os.path.basename(file_path))
+            if isinstance(inputs, dict):
+                for name, file_path in inputs.items():
+                    if file_path and os.path.exists(file_path):
+                        tar.add(file_path, arcname=name)
+            else:
+                for file_path in inputs:
+                    if file_path and os.path.exists(file_path):
+                        tar.add(file_path, arcname=os.path.basename(file_path))
         return archive_path
 
     # ------------------------------------------------------------------

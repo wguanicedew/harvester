@@ -5,6 +5,7 @@ ntasks_total=1
 ntasks=-1
 cpus_per_task=-1
 mem_per_cpu=-1
+input_archive=""
 
 myargs="$@"
 
@@ -13,6 +14,11 @@ while [[ $# -gt 0 ]]
 do
 key="$1"
 case $key in
+    --input_archive)
+    input_archive="$2"
+    shift
+    shift
+    ;;
     --ntasks-total)
     ntasks_total="$2"
     shift
@@ -88,6 +94,29 @@ pilot_wrapper_cmd="${pandaenvdir}/pilot/wrapper/runpilot3_wrapper.sh ${piloturl}
 echo $cmd
 echo $pilot_wrapper_cmd
 echo 
+
+# if input_archive is not empty, we can use srun to launch multiple tasks in parallel
+if [[ -n "${input_archive}" ]]; then
+    echo "Extracting input archive: ${input_archive}"
+    cp ${input_archive} .
+    tar -xzf $(basename ${input_archive})
+fi
+
+# "executable_batch": batchFile,
+# "token_file": token_file,
+# "token_vo_file": token_vo_file,
+# "x509_proxy": self.x509_proxy,
+# "pandaJobData.out": os.path.join(workSpec.accessPoint, "pandaJobData.out")}
+# if file x509up is there, set X509_USER_PROXY to x509up
+if [[ -f x509_proxy ]]; then
+    echo "Found x509_proxy file, setting X509_USER_PROXY to $(pwd)/x509_proxy"
+    export X509_USER_PROXY=$(pwd)/x509_proxy
+elif [[ -f token_file ]] && [[ -f token_vo_file ]]; then
+    echo "Found token_file and token_vo_file, setting PANDA_AUTH_ID_TOKEN and PANDA_AUTH_VO"
+    export PANDA_AUTH_ID_TOKEN=$(cat token_file);
+    export PANDA_AUTH_VO=$(cat token_vo_file);
+    export PANDA_AUTH=oidc;
+fi
 
 # ntasks=${ntasks_total}
 # for i in $(seq 1 $ntasks); do

@@ -38,6 +38,7 @@ class IriSubmitter(PluginBase):
         if not self.remote_work_dir:
             raise ValueError("remote_work_dir must be specified in iri_submitter configuration")
         self.remote_export_path = kwarg.get("remote_export_path", None)
+        self.remote_input_cache = kwarg.get("remote_input_cache", None)
         self.htaccess_password = None
         if not self.remote_export_path:
             self.download_transfer_output_through_iri = True
@@ -87,7 +88,43 @@ class IriSubmitter(PluginBase):
             else:
                 duration = int(placeholder["requestWalltime"]) if placeholder["requestWalltime"] else None
 
+            try:
+                if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
+                    token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
+                    token_vo = getattr(self, "pandaTokenVO", None)
+                    if token_vo:
+                        token_vo_file = os.path.join(self.pandaTokenDir, f"token_vo")
+                        with open(token_vo_file, "w") as f:
+                            f.write(token_vo)
+                else:
+                    token_file = None
+                    token_vo_file = None
+                input_maps = {"executable_batch": batchFile,
+                              "token_file": token_file,
+                              "token_vo_file": token_vo_file,
+                              "x509_proxy": self.x509_proxy,
+                              "pandaJobData.out": os.path.join(workSpec.accessPoint, "pandaJobData.out")}
+                archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input)
+                if self.iri_debug:
+                    tmpLog.debug(f"Created input archive: {archive_file}")
+                if self.remote_input_cache:
+                    remote_input_cache = self.remote_input_cache
+                else:
+                    remote_input_cache = os.path.join(self.remote_work_dir, "input_cache")
+                archive_name = os.path.basename(archive_file)
+                remote_archive_name = os.path.join(str(workSpec.workerID), archive_name)
+                remote_archive_path = os.path.join(remote_input_cache, remote_archive_name)
+                ret = self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
+                if self.iri_debug:
+                    tmpLog.debug(f"Uploaded input archive {archive_file} to {remote_archive_path}: {ret}")
+            except IriClientError as e:
+                err = f"IRI upload inputs failed: {e}"
+                tmpLog.error(err)
+                retList.append((False, err))
+                continue
+            
             pilot_args_template = (
+                f"--input_archive {remote_archive_path} "
                 "--ntasks-total {nCoreTotal} --ntasks 1 --cpus-per-task 1 --mem-per-cpu {requestRamPerCore} "
                 "-s {computingSite} -r {computingSite} -q {pandaQueueName} -j {prodSourceLabel} -i {pilotType} "
                 "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false "
@@ -126,18 +163,6 @@ class IriSubmitter(PluginBase):
             }
 
             try:
-                if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
-                    token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
-                else:
-                    token_file = None
-                input_files = [batchFile, token_file, self.x509_proxy, os.path.join(workSpec.accessPoint, "pandaJobData.out")]
-                archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input_files)
-                if self.iri_debug:
-                    tmpLog.debug(f"Created input archive: {archive_file}")
-                remote_archive_path = os.path.join(remote_worker_dir, os.path.basename(archive_file))
-                ret = self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
-                if self.iri_debug:
-                    tmpLog.debug(f"Uploaded input archive {archive_file} to {remote_archive_path}: {ret}")
                 if self.iri_debug:
                     tmpLog.debug(f"To submit job with job_spec: {job_spec}")
                 job = self.iri_client.launch_job(job_spec, resource_id=self.iri_resource_id)

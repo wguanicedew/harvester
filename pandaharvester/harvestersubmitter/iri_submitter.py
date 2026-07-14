@@ -21,6 +21,7 @@ class IriSubmitter(PluginBase):
         PluginBase.__init__(self, **kwarg)
         self.iri_config = kwarg.get("iri_config")
         self.iri_resource_id = kwarg.get("iri_resource_id")
+        self.iri_debug = kwarg.get("iri_debug", False)
 
         self.pandaTokenFilename = getattr(self, "pandaTokenFilename", None)
         self.pandaTokenDir = getattr(self, "pandaTokenDir", None)
@@ -47,7 +48,8 @@ class IriSubmitter(PluginBase):
                     self.htaccess_password = f.read().strip()
 
         self.iri_client = IriClient(config_path=self.iri_config,
-                                    resource_id=self.iri_resource_id)
+                                    resource_id=self.iri_resource_id,
+                                    debug=self.iri_debug)
 
         if not hasattr(self, "localQueueName"):
             self.localQueueName = "debug"
@@ -110,8 +112,12 @@ class IriSubmitter(PluginBase):
                     token_file = None
                 input_files = [batchFile, token_file, self.x509_proxy, os.path.join(workSpec.accessPoint, "pandaJobData.out")]
                 archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input_files)
+                if self.iri_debug:
+                    tmpLog.debug(f"Created input archive: {archive_file}")
                 remote_archive_path = os.path.join(remote_worker_dir, os.path.basename(archive_file))
                 self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
+                if self.iri_debug:
+                    tmpLog.debug(f"To submit job with job_spec: {job_spec}")
                 job = self.iri_client.launch_job(job_spec, resource_id=self.iri_resource_id)
             except IriClientError as e:
                 err = f"IRI job submission failed: {e}"

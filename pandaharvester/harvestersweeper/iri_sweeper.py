@@ -13,13 +13,17 @@ class IriSweeper(BaseSweeper):
         BaseSweeper.__init__(self, **kwargs)
         self.iri_config = kwargs.get("iri_config")
         self.iri_resource_id = kwargs.get("iri_resource_id")
-        self.iri_client = IriClient(config_path=self.iri_config, resource_id=self.iri_resource_id)
+        self.iri_debug = kwargs.get("iri_debug", False)
+        self.iri_client = IriClient(config_path=self.iri_config, resource_id=self.iri_resource_id, debug=self.iri_debug)
 
     def kill_worker(self, workspec):
         tmpLog = self.make_logger(baseLogger, f"workerID={workspec.workerID}", method_name="kill_worker")
         job_id = workspec.batchID
         if not job_id:
             return False, "no batchID to kill"
+
+        if self.iri_debug:
+            tmpLog.debug(f"cancelling IRI job {job_id}")
 
         try:
             self.iri_client.cancel_job(job_id, resource_id=self.iri_resource_id)

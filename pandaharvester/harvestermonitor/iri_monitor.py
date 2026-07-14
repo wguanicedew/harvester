@@ -19,7 +19,8 @@ class IriMonitor(PluginBase):
         PluginBase.__init__(self, **kwarg)
         self.iri_config = kwarg.get("iri_config")
         self.iri_resource_id = kwarg.get("iri_resource_id")
-        self.iri_client = IriClient(config_path=self.iri_config, resource_id=self.iri_resource_id)
+        self.iri_debug = kwarg.get("iri_debug", False)
+        self.iri_client = IriClient(config_path=self.iri_config, resource_id=self.iri_resource_id, debug=self.iri_debug)
 
         self.remote_export_path = kwarg.get("remote_export_path", None)
         self.download_transfer_output_through_iri = not bool(self.remote_export_path)
@@ -47,6 +48,9 @@ class IriMonitor(PluginBase):
             except IriClientError as e:
                 retList.append((WorkSpec.ST_failed, f"cannot query IRI job {job_id} due to {e}"))
                 continue
+
+            if self.iri_debug:
+                tmpLog.debug(f"IRI job status: {job}")
 
             status = job.get("status") or {}
             batchStatus = (status.get("state") or "").lower()

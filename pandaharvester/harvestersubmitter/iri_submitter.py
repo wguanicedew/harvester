@@ -87,9 +87,24 @@ class IriSubmitter(PluginBase):
             else:
                 duration = int(placeholder["requestWalltime"]) if placeholder["requestWalltime"] else None
 
+            pilot_args_template = (
+                "--ntasks-total {nCoreTotal} --ntasks 1 --cpus-per-task 1 --mem-per-cpu {requestRamPerCore} "
+                "-s {computingSite} -r {computingSite} -q {pandaQueueName} -j {prodSourceLabel} -i {pilotType} "
+                "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false "
+                "--url https://pandaserver01.sdcc.bnl.gov -p 25443 --harvester-submit-mode PULL "
+                "--queuedata-url https://pandaserver01.sdcc.bnl.gov:25443/cache/schedconfig/{computingSite}.all.json "
+            )
+
+            #  -s E1_JLAB -r E1_JLAB -e eic -q E1_JLAB -j unified -i PR -t -w generic
+            # --pilot-user epic --url https://pandaserver01.sdcc.bnl.gov -p 25443 -d
+            # --harvester-submit-mode PUSH --allow-same-user=False --job-type=test 
+            # --resource-type SCORE --pilotversion 3 --use-rucio
+            # -traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443
+            pilot_args = pilot_args_template.format_map(core_utils.SafeDict(placeholder)).split()
+
             job_spec = {
                 "executable": self.remote_executable,
-                "arguments": [batchFile],
+                "arguments": pilot_args,
                 "directory": remote_worker_dir,
                 "name": f"harvester-{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
@@ -220,6 +235,8 @@ class IriSubmitter(PluginBase):
             "logDir": self.logDir,
             "logSubDir": os.path.join(self.logDir, timeNow.strftime("%y-%m-%d_%H")),
             "jobType": workspec.jobType,
+            "prodSourceLabel": workspec.jobType,
+            "pilotType": workspec.pilotType,
         }
         for k in ["tokenDir", "tokenName", "tokenOrigin", "submitMode"]:
             try:

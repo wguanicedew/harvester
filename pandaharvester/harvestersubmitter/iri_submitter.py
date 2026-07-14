@@ -91,7 +91,8 @@ class IriSubmitter(PluginBase):
             try:
                 if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
                     token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
-                    token_vo = getattr(self, "pandaTokenVO", None)
+                    token_vo = placeholder.get("tokenOrigin", None)
+                    token_vo_file = None
                     if token_vo:
                         token_vo_file = os.path.join(self.pandaTokenDir, f"token_vo")
                         with open(token_vo_file, "w") as f:

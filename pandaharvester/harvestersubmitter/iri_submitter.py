@@ -112,9 +112,9 @@ class IriSubmitter(PluginBase):
                 "stderr_path": os.path.join(remote_worker_dir, "stderr.txt"),
                 "resources": {
                     "node_count": placeholder["nNode"],
-                    "process_count": placeholder["nNode"],
-                    "processes_per_node": 1,
-                    "cpu_cores_per_process": placeholder["nCorePerNode"],
+                    "process_count": placeholder["nCoreTotal"],
+                    "processes_per_node": placeholder["nCorePerNode"],
+                    "cpu_cores_per_process": 1,
                     "memory": int(placeholder["requestRamBytes"]) if placeholder["requestRamBytes"] else None,
                 },
                 "attributes": {
@@ -196,7 +196,7 @@ class IriSubmitter(PluginBase):
 
         n_core_factor = self.get_core_factor(workspec, logger)
 
-        n_core_total = workspec.nCore if workspec.nCore else n_core_per_node
+        n_core_total = self.nCore if self.nCore else n_core_per_node
         n_core_total_factor = n_core_total * n_core_factor
         request_ram = max(workspec.minRamCount, 1 * n_core_total) if workspec.minRamCount else 1 * n_core_total
         request_disk = workspec.maxDiskCount * 1024 if workspec.maxDiskCount else 1

@@ -135,7 +135,9 @@ class IriSubmitter(PluginBase):
                 if self.iri_debug:
                     tmpLog.debug(f"Created input archive: {archive_file}")
                 remote_archive_path = os.path.join(remote_worker_dir, os.path.basename(archive_file))
-                self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
+                ret = self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
+                if self.iri_debug:
+                    tmpLog.debug(f"Uploaded input archive {archive_file} to {remote_archive_path}: {ret}")
                 if self.iri_debug:
                     tmpLog.debug(f"To submit job with job_spec: {job_spec}")
                 job = self.iri_client.launch_job(job_spec, resource_id=self.iri_resource_id)

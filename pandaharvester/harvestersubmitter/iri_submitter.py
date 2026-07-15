@@ -150,9 +150,9 @@ class IriSubmitter(PluginBase):
                 "stderr_path": os.path.join(remote_worker_dir, "stderr.txt"),
                 "resources": {
                     "node_count": placeholder["nNode"],
-                    "process_count": placeholder["nCoreTotal"],
-                    "processes_per_node": placeholder["nCorePerNode"],
-                    "cpu_cores_per_process": 1,
+                    "process_count": placeholder["nNode"],
+                    "processes_per_node": 1,
+                    "cpu_cores_per_process": placeholder["nCorePerNode"],
                     "memory": int(placeholder["requestRamBytes"]) if placeholder["requestRamBytes"] else None,
                 },
                 "attributes": {

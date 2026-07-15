@@ -128,7 +128,7 @@ class IriSubmitter(PluginBase):
                 f"--input_archive {remote_archive_path} "
                 "--ntasks-total {nCoreTotal} --ntasks 1 --cpus-per-task 1 --mem-per-cpu {requestRamPerCore} "
                 "-s {computingSite} -r {computingSite} -q {pandaQueueName} -j {prodSourceLabel} -i {pilotType} "
-                "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false "
+                "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false -e eic "
                 "--url https://pandaserver01.sdcc.bnl.gov -p 25443 --harvester-submit-mode PULL "
                 "--queuedata-url https://pandaserver01.sdcc.bnl.gov:25443/cache/schedconfig/{computingSite}.all.json "
                 "--use-rucio-traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443 "

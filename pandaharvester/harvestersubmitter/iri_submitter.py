@@ -105,7 +105,7 @@ class IriSubmitter(PluginBase):
                               "token_vo_file": token_vo_file,
                               "x509_proxy": self.x509_proxy,
                               "pandaJobData.out": os.path.join(workSpec.accessPoint, "pandaJobData.out")}
-                archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input)
+                archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input_maps)
                 if self.iri_debug:
                     tmpLog.debug(f"Created input archive: {archive_file}")
                 if self.remote_input_cache:

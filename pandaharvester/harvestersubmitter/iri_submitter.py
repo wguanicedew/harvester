@@ -113,7 +113,7 @@ class IriSubmitter(PluginBase):
                 else:
                     remote_input_cache = os.path.join(self.remote_work_dir, "input_cache")
                 archive_name = os.path.basename(archive_file)
-                remote_archive_name = os.path.join(str(workSpec.workerID), archive_name)
+                remote_archive_name = f"{workSpec.workerID}_{archive_name}"
                 remote_archive_path = os.path.join(remote_input_cache, remote_archive_name)
                 ret = self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
                 if self.iri_debug:

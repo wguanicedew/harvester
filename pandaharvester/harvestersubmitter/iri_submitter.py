@@ -131,6 +131,7 @@ class IriSubmitter(PluginBase):
                 "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false "
                 "--url https://pandaserver01.sdcc.bnl.gov -p 25443 --harvester-submit-mode PULL "
                 "--queuedata-url https://pandaserver01.sdcc.bnl.gov:25443/cache/schedconfig/{computingSite}.all.json "
+                "--use-rucio-traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443 "
             )
 
             #  -s E1_JLAB -r E1_JLAB -e eic -q E1_JLAB -j unified -i PR -t -w generic

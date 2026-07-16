@@ -68,6 +68,9 @@ class IriMonitor(PluginBase):
                 newStatus = WorkSpec.ST_failed
             tmpLog.debug(f"batchStatus {batchStatus} -> workerStatus {newStatus}")
 
+            if self.iri_debug:
+                tmpLog.debug(f"IRI job {job_id} status: {batchStatus}, exitCode: {exitCode}, mapped to workerStatus: {newStatus}")
+                tmpLog.debug(f"IRI job {job_id} download output through IRI: {self.download_transfer_output_through_iri}")
             if newStatus in _TERMINAL_STATUSES and not self.download_transfer_output_through_iri:
                 for filename in ("stdout.txt", "stderr.txt"):
                     local_dest = os.path.join(workSpec.accessPoint, filename)

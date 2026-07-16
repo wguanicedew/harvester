@@ -37,6 +37,9 @@ class IriSubmitter(PluginBase):
         self.remote_work_dir = kwarg.get("remote_work_dir", None)
         if not self.remote_work_dir:
             raise ValueError("remote_work_dir must be specified in iri_submitter configuration")
+        self.remote_log_dir = kwarg.get("remote_log_dir", None)
+        if not self.remote_log_dir:
+            raise ValueError("remote_log_dir must be specified in iri_submitter configuration")
         self.remote_export_path = kwarg.get("remote_export_path", None)
         self.remote_input_cache = kwarg.get("remote_input_cache", None)
         self.htaccess_password = None
@@ -141,14 +144,18 @@ class IriSubmitter(PluginBase):
             # -traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443
             pilot_args = pilot_args_template.format_map(core_utils.SafeDict(placeholder)).split()
 
+            remote_log_dir = os.path.join(self.remote_log_dir, str(workSpec.workerID))
+            stdout_path = os.path.join(remote_log_dir, "stdout.txt")
+            stderr_path = os.path.join(remote_log_dir, "stderr.txt")
+
             job_spec = {
                 "executable": self.remote_executable,
                 "arguments": pilot_args,
                 "directory": remote_worker_dir,
                 "name": f"harvester-{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
-                "stdout_path": os.path.join(remote_worker_dir, "stdout.txt"),
-                "stderr_path": os.path.join(remote_worker_dir, "stderr.txt"),
+                "stdout_path": stdout_path,
+                "stderr_path": stderr_path,
                 "resources": {
                     "node_count": placeholder["nNode"],
                     "process_count": placeholder["nNode"],

@@ -129,7 +129,7 @@ class IriSubmitter(PluginBase):
             
             remote_log_dir = os.path.join(self.remote_log_dir, str(workSpec.workerID))
             pilot_args_template = (
-                f"--input_archive {remote_archive_path} --log_dir {remote_log_dir}"
+                f"--input_archive {remote_archive_path} --log_dir {remote_log_dir} "
                 "--ntasks-total {nCoreTotal} --ntasks 1 --cpus-per-task 1 --mem-per-cpu {requestRamPerCore} "
                 "-s {computingSite} -r {computingSite} -q {pandaQueueName} -j {prodSourceLabel} -i {pilotType} "
                 "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false -e eic "

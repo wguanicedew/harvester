@@ -162,7 +162,7 @@ class IriSubmitter(PluginBase):
                     "process_count": placeholder["nNode"],
                     "processes_per_node": 1,
                     "cpu_cores_per_process": placeholder["nCorePerNode"],
-                    "memory": int(placeholder["requestRamBytes"]) if placeholder["requestRamBytes"] else None,
+                    "memory": int(placeholder["requestRamBytes"]) * placeholder["nCorePerNode"] * placeholder["nNode"] if placeholder["requestRamBytes"] else None,
                 },
                 "attributes": {
                     "duration": int(duration) if duration else None,
@@ -243,8 +243,16 @@ class IriSubmitter(PluginBase):
         request_ram_factor = request_ram * n_core_factor
         request_ram_bytes = request_ram * (2**20)
         request_ram_bytes_factor = request_ram_bytes * n_core_factor
-        request_ram_per_core = ceil(request_ram * n_node / n_core_total)
-        request_ram_bytes_per_core = ceil(request_ram_bytes * n_node / n_core_total)
+        request_ram_per_core = request_ram
+
+        request_ram_bytes_per_core = request_ram * (2**20)
+        request_ram_bytes_factor_per_core = request_ram_bytes_per_core * n_core_factor
+
+        request_ram_total = request_ram * n_core_total
+        request_ram_total_factor = request_ram_total * n_core_factor
+        request_ram_bytes_total = request_ram_bytes_per_core * n_core_total
+        request_ram_bytes_total_factor = request_ram_bytes_total * n_core_factor
+
         request_cputime = request_walltime * n_core_total
         request_walltime_minute = ceil(request_walltime / 60)
         request_cputime_minute = ceil(request_cputime / 60)
@@ -254,8 +262,8 @@ class IriSubmitter(PluginBase):
             "nCoreTotal": n_core_total_factor,
             "nCoreFactor": n_core_factor,
             "nNode": n_node,
-            "requestRam": request_ram_factor,
-            "requestRamBytes": request_ram_bytes_factor,
+            "requestRam": request_ram_total_factor,
+            "requestRamBytes": request_ram_bytes_total_factor,
             "requestRamPerCore": request_ram_per_core,
             "requestRamBytesPerCore": request_ram_bytes_per_core,
             "requestDisk": request_disk,

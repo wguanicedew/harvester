@@ -6,6 +6,7 @@ ntasks=-1
 cpus_per_task=-1
 mem_per_cpu=-1
 input_archive=""
+log_dir=""
 
 myargs="$@"
 
@@ -16,6 +17,11 @@ key="$1"
 case $key in
     --input_archive)
     input_archive="$2"
+    shift
+    shift
+    ;;
+    --log_dir)
+    log_dir="$2"
     shift
     shift
     ;;
@@ -101,7 +107,11 @@ if [[ -n "${input_archive}" ]]; then
     cp ${input_archive} .
     tar -xzf $(basename ${input_archive})
 fi
-
+if [[ -n "${log_dir}" ]]; then
+    echo "Creating log directory: ${log_dir}"
+    mkdir -p ${log_dir}
+    chmod -R a+r ${log_dir}
+fi
 # "executable_batch": batchFile,
 # "token_file": token_file,
 # "token_vo_file": token_vo_file,

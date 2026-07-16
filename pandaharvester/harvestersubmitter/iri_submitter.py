@@ -127,8 +127,9 @@ class IriSubmitter(PluginBase):
                 retList.append((False, err))
                 continue
             
+            remote_log_dir = os.path.join(self.remote_log_dir, str(workSpec.workerID))
             pilot_args_template = (
-                f"--input_archive {remote_archive_path} "
+                f"--input_archive {remote_archive_path} --log_dir {remote_log_dir}"
                 "--ntasks-total {nCoreTotal} --ntasks 1 --cpus-per-task 1 --mem-per-cpu {requestRamPerCore} "
                 "-s {computingSite} -r {computingSite} -q {pandaQueueName} -j {prodSourceLabel} -i {pilotType} "
                 "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false -e eic "
@@ -144,7 +145,6 @@ class IriSubmitter(PluginBase):
             # -traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443
             pilot_args = pilot_args_template.format_map(core_utils.SafeDict(placeholder)).split()
 
-            remote_log_dir = os.path.join(self.remote_log_dir, str(workSpec.workerID))
             stdout_path = os.path.join(remote_log_dir, "stdout.txt")
             stderr_path = os.path.join(remote_log_dir, "stderr.txt")
 

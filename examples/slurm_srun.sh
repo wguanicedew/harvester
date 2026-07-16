@@ -157,3 +157,12 @@ echo $cmd --export=ALL --ntasks=${ntasks_total} --cpu-bind=none ./my_panda_run_s
 echo
 
 $cmd --export=ALL --ntasks=${ntasks_total} --cpu-bind=none ./my_panda_run_script
+
+ret=$?
+
+if [[ -n "${log_dir}" ]]; then
+    echo "Copying logs to ${log_dir}"
+    cp -r $(pwd)/stdout.txt ${log_dir}/
+    cp -r $(pwd)/stderr.txt ${log_dir}/
+fi
+exit $ret

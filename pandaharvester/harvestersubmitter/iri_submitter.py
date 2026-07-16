@@ -145,8 +145,9 @@ class IriSubmitter(PluginBase):
             # -traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443
             pilot_args = pilot_args_template.format_map(core_utils.SafeDict(placeholder)).split()
 
-            stdout_path = os.path.join(remote_log_dir, "stdout.txt")
-            stderr_path = os.path.join(remote_log_dir, "stderr.txt")
+            remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
+            stdout_path = os.path.join(remote_worker_dir, "stdout.txt")
+            stderr_path = os.path.join(remote_worker_dir, "stderr.txt")
 
             job_spec = {
                 "executable": self.remote_executable,

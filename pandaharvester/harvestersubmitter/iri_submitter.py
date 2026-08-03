@@ -159,18 +159,42 @@ class IriSubmitter(PluginBase):
                 "stderr_path": stderr_path,
                 "resources": {
                     "node_count": placeholder["nNode"],
-                    "process_count": placeholder["nNode"],
-                    "processes_per_node": 1,
-                    "cpu_cores_per_process": placeholder["nCorePerNode"],
+                    "process_count": placeholder["nNode"] * placeholder["nProcessPerNode"],
+                    "processes_per_node": placeholder["nProcessPerNode"],
+                    "cpu_cores_per_process": placeholder["nCorePerProcess"],
+                    "gpu_cores_per_process": 0,
+                    "exclusive_node_use": True,
                     "memory": int(placeholder["requestRamBytes"]) * placeholder["nCorePerNode"] * placeholder["nNode"] if placeholder["requestRamBytes"] else None,
+                    "additionalProp1": {},
                 },
                 "attributes": {
                     "duration": int(duration) if duration else None,
                     "queue_name": self.remoteQueueName,
                     "account": getattr(self, "project", None),
+                    "reservation_id": getattr(self, "reservation_id", None),
+                    "additionalProp1": {}
                 },
-                "launcher": "single",
+                "pre_launch": getattr(self, "pre_launch", None),   # model load cvmfs
+                "post_launch": getattr(self, "post_launch", None),
+                "launcher": "single",  # single, mpirun, srun, aprun, jsrun
             }
+            custom_attributes = {}
+            if getattr(self, "constraint", None) is not None:
+                custom_attributes["constraint"] = self.constraint
+            if getattr(self, "signal", None) is not None:
+                custom_attributes["signal"] = self.signal
+            if getattr(self, "no_requeue", None):
+                custom_attributes["no_requeue"] = True
+            if getattr(self, "licenses", None) is not None:
+                custom_attributes["licenses"] = self.licenses
+            if getattr(self, "export", None) is not None:
+                custom_attributes["export"] = self.export
+            if getattr(self, "image", None) is not None:
+                custom_attributes["image"] = self.image
+            if getattr(self, "volume", None) is not None:
+                custom_attributes["volume"] = self.volume
+            if custom_attributes:
+                job_spec["attributes"]["custom_attributes"] = custom_attributes
 
             try:
                 if self.iri_debug:
@@ -233,6 +257,9 @@ class IriSubmitter(PluginBase):
 
         n_core_factor = self.get_core_factor(workspec, logger)
 
+        n_process_per_node = getattr(self, "nProcessPerNode", 1)
+        n_core_per_process = n_core_per_node / n_process_per_node
+
         n_core_total = self.nCore if self.nCore else n_core_per_node
         n_core_total_factor = n_core_total * n_core_factor
         request_ram = max(workspec.minRamCount, 1 * n_core_total) if workspec.minRamCount else 1 * n_core_total
@@ -259,6 +286,8 @@ class IriSubmitter(PluginBase):
 
         placeholder_map = {
             "nCorePerNode": n_core_per_node,
+            "nCorePerProcess": n_core_per_process,
+            "nProcessPerNode": n_process_per_node,
             "nCoreTotal": n_core_total_factor,
             "nCoreFactor": n_core_factor,
             "nNode": n_node,

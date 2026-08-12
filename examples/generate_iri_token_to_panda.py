@@ -3,7 +3,8 @@
 
 This script uses the vendored examples/get_globus_token.py to obtain tokens for
 NERSC or ALCF. After obtaining a token it calls pandaclient.Client.set_user_secret
-to store the access token under the provided Panda secret key.
+to store the access token under the provided Panda secret key, and also writes an
+iri_config.yaml at --iri_config (see --base_url and --resource_id).
 
 Required packages:
   pip install panda-client globus-sdk
@@ -38,6 +39,10 @@ except Exception:  # pragma: no cover - example
     Client = None
 
 
+DEFAULT_BASE_URL = "https://api.iri.nersc.gov"
+DEFAULT_RESOURCE_ID = "59e80c79-4dfd-4c53-9c07-7405685fcd37"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate or refresh an IRI token and store it in Panda user secrets")
     parser.add_argument("--facilities", nargs="+", choices=["nersc", "alcf"], default=["nersc"], help="Facility to request token for")
@@ -46,7 +51,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force-login", action="store_true", help="Interactive setup mode: force an interactive Globus login flow to (re)generate the saved token")
     parser.add_argument("--prompt-login", action="store_true", help="Add prompt=login to auth URL")
     parser.add_argument("--panda_secret_key", required=True, help="Panda secret key name to set the access token under")
+    parser.add_argument("--iri_config", type=Path, default=Path.cwd() / "iri_config.yaml", help="Path to also write iri_config.yaml")
+    parser.add_argument("--base_url", default=DEFAULT_BASE_URL, help="IRI API base URL")
+    parser.add_argument("--resource_id", default=DEFAULT_RESOURCE_ID, help="IRI resource ID")
     return parser.parse_args()
+
+
+IRI_CONFIG_TEMPLATE = """# IRI API client configuration
+# Copy this file to e.g. ~/.iri.yaml and fill in your values.
+
+base_url: {base_url}
+
+resource_id: {resource_id}
+access_token: {token}
+"""
 
 
 def main() -> None:
@@ -80,6 +98,15 @@ def main() -> None:
         print(f"Failed to set Panda secret: status={status} message={message}")
         sys.exit(5)
     print(f"Set Panda user secret '{args.panda_secret_key}' successfully.")
+
+    content = IRI_CONFIG_TEMPLATE.format(token=access_token, base_url=args.base_url, resource_id=args.resource_id)
+    try:
+        args.iri_config.parent.mkdir(parents=True, exist_ok=True)
+        args.iri_config.write_text(content, encoding="utf-8")
+        print(f"Wrote IRI config to {args.iri_config}")
+    except Exception as exc:
+        print(f"Failed to write IRI config: {exc}")
+        sys.exit(6)
 
 
 if __name__ == "__main__":

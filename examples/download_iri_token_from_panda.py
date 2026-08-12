@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Download an IRI access token from Panda user secrets and write an iri_config.yaml
 
-The script calls pandaclient.get_user_secret to retrieve the secret value stored under
-the provided --panda_secret_key and writes an iri_config.yaml at --iri_config.
+The script calls pandaclient.Client.get_user_secrets and looks up the value stored under
+the provided --panda_secret_key, then writes an iri_config.yaml at --iri_config.
 
 Required packages:
   pip install panda-client
@@ -18,9 +18,9 @@ import sys
 from pathlib import Path
 
 try:
-    import pandaclient
+    from pandaclient import Client
 except Exception:  # pragma: no cover - example
-    pandaclient = None
+    Client = None
 
 
 DEFAULT_BASE_URL = "https://api.iri.nersc.gov"
@@ -48,16 +48,16 @@ access_token: {token}
 
 def main() -> None:
     args = parse_args()
-    if pandaclient is None:
+    if Client is None:
         print("pandaclient not available; cannot get Panda secret. Install pandaclient or run in appropriate env.")
         sys.exit(2)
 
-    try:
-        token = pandaclient.get_user_secret(args.panda_secret_key)
-    except Exception as exc:
-        print(f"Failed to get Panda user secret '{args.panda_secret_key}': {exc}")
+    status, (success, secrets) = Client.get_user_secrets()
+    if status != 0 or not success:
+        print(f"Failed to get Panda user secrets: status={status} data={secrets}")
         sys.exit(3)
 
+    token = secrets.get(args.panda_secret_key)
     if not token:
         print(f"Panda secret '{args.panda_secret_key}' is empty")
         sys.exit(4)

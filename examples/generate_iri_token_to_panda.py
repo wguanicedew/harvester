@@ -2,8 +2,8 @@
 """Generate or refresh an IRI access token and store it in Panda as a user secret.
 
 This script uses the vendored examples/get_globus_token.py to obtain tokens for
-NERSC or ALCF. After obtaining a token it calls pandaclient.set_user_secret to
-store the access token under the provided Panda secret key.
+NERSC or ALCF. After obtaining a token it calls pandaclient.Client.set_user_secret
+to store the access token under the provided Panda secret key.
 
 Required packages:
   pip install panda-client globus-sdk
@@ -33,9 +33,9 @@ from get_globus_token import get_tokens, get_facility_token
 
 try:
     # pandaclient is optional in examples; import when available
-    import pandaclient
+    from pandaclient import Client
 except Exception:  # pragma: no cover - example
-    pandaclient = None
+    Client = None
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,17 +70,16 @@ def main() -> None:
         print("No access_token found in token data")
         sys.exit(3)
 
-    if pandaclient is None:
+    if Client is None:
         print("pandaclient not available; cannot set Panda secret. Install pandaclient or run this in an environment with it.")
         sys.exit(4)
 
     # set the user secret
-    try:
-        pandaclient.set_user_secret(args.panda_secret_key, access_token)
-        print(f"Set Panda user secret '{args.panda_secret_key}' successfully.")
-    except Exception as exc:
-        print(f"Failed to set Panda secret: {exc}")
+    status, (success, message) = Client.set_user_secret(args.panda_secret_key, access_token)
+    if status != 0 or not success:
+        print(f"Failed to set Panda secret: status={status} message={message}")
         sys.exit(5)
+    print(f"Set Panda user secret '{args.panda_secret_key}' successfully.")
 
 
 if __name__ == "__main__":

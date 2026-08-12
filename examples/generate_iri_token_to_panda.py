@@ -5,6 +5,9 @@ This script uses the vendored examples/get_globus_token.py to obtain tokens for
 NERSC or ALCF. After obtaining a token it calls pandaclient.set_user_secret to
 store the access token under the provided Panda secret key.
 
+Required packages:
+  pip install panda-client globus-sdk
+
 Two usage modes:
   Cron job (--refresh-only): non-interactive, intended to run unattended on a
     schedule. Only attempts to refresh a previously saved token; if the saved

@@ -4,6 +4,9 @@
 The script calls pandaclient.get_user_secret to retrieve the secret value stored under
 the provided --panda_secret_key and writes an iri_config.yaml at --iri_config.
 
+Required packages:
+  pip install panda-client
+
 Example:
   python examples/download_iri_token_from_panda.py --panda_secret_key IRI_ACCESS --iri_config ./iri_config.yaml \\
       --base_url https://api.iri.nersc.gov --resource_id 59e80c79-4dfd-4c53-9c07-7405685fcd37

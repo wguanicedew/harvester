@@ -25,7 +25,9 @@ class IriSubmitter(PluginBase):
 
         self.pandaTokenFilename = getattr(self, "pandaTokenFilename", None)
         self.pandaTokenDir = getattr(self, "pandaTokenDir", None)
-        self.x509_proxy = getattr(self, "x509_proxy", None)
+        self.pandaTokenKeyFilename = getattr(self, "pandaTokenKeyFilename", None)
+        self.pandaAuthOrigin = getattr(self, "pandaAuthOrigin", None)
+        self.x509UserProxy = getattr(self, "x509UserProxy", os.getenv("X509_USER_PROXY"))
 
         self.templateFile = kwarg.get("templateFile", None)
         self.remoteQueueName = kwarg.get("remoteQueueName", None)
@@ -83,30 +85,35 @@ class IriSubmitter(PluginBase):
             if self.nCore > 0:
                 workSpec.nCore = self.nCore
             # make batch script, here we create batch script at where harvester install
-            batchFile = self.make_batch_script(workSpec, tmpLog)
             placeholder = self.make_placeholder_map(workSpec, tmpLog)
+            batchFile = self.make_batch_script(workSpec, placeholder, tmpLog)
             remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
             if self.duration:
                 duration = self.duration
             else:
                 duration = int(placeholder["requestWalltime"]) if placeholder["requestWalltime"] else None
 
+            # Execution flow on the remote resource (see examples/hpc/nersc/perlmutter_iri_main.sh
+            # and examples/hpc/nersc/perlmutter_iri_submit_template.sh for a concrete example):
+            #   1) build a tar archive here containing executable_batch (the batch script rendered
+            #      from templateFile), pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy and
+            #      pandaJobData.out
+            #   2) upload the archive to remote_input_cache on the remote resource
+            #   3) launch remote_executable (pre-deployed on the remote resource) with its cwd set to
+            #      remote_worker_dir (job_spec["directory"]), passing --input_archive <remote_archive_path>
+            #   4) remote_executable copies the archive into that working directory and untars it there
+            #   5) remote_executable runs the extracted "executable_batch" script from that same
+            #      directory, so "$(pwd)/<name>" inside the batch script resolves to the other
+            #      extracted files (pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy)
             try:
                 if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
                     token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
-                    token_vo = placeholder.get("tokenOrigin", None)
-                    token_vo_file = None
-                    if token_vo:
-                        token_vo_file = os.path.join(self.pandaTokenDir, f"token_vo")
-                        with open(token_vo_file, "w") as f:
-                            f.write(token_vo)
                 else:
                     token_file = None
-                    token_vo_file = None
                 input_maps = {"executable_batch": batchFile,
-                              "token_file": token_file,
-                              "token_vo_file": token_vo_file,
-                              "x509_proxy": self.x509_proxy,
+                              "pandaTokenFilename": token_file,
+                              "pandaTokenKeyFilename": self.pandaTokenKeyFilename,
+                              "x509UserProxy": self.x509UserProxy,
                               "pandaJobData.out": os.path.join(workSpec.accessPoint, "pandaJobData.out")}
                 archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input_maps)
                 if self.iri_debug:
@@ -127,33 +134,24 @@ class IriSubmitter(PluginBase):
                 retList.append((False, err))
                 continue
             
-            remote_log_dir = os.path.join(self.remote_log_dir, str(workSpec.workerID))
-            pilot_args_template = (
-                f"--input_archive {remote_archive_path} --log_dir {remote_log_dir} "
-                "--ntasks-total {nCoreTotal} --ntasks 1 --cpus-per-task 1 --mem-per-cpu {requestRamPerCore} "
-                "-s {computingSite} -r {computingSite} -q {pandaQueueName} -j {prodSourceLabel} -i {pilotType} "
-                "--es-executor-type fineGrainedProc -w generic --pilot-user epic --allow-same-user false -e eic "
-                "--url https://pandaserver01.sdcc.bnl.gov -p 25443 --harvester-submit-mode PULL "
-                "--queuedata-url https://pandaserver01.sdcc.bnl.gov:25443/cache/schedconfig/{computingSite}.all.json "
-                "--use-rucio-traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443 "
-            )
+            remote_log_dir = placeholder["remote_log_dir"]
+            remote_worker_dir = placeholder["work_dir"]
+            stdout_path = placeholder["stdout_path"]
+            stderr_path = placeholder["stderr_path"]
 
-            #  -s E1_JLAB -r E1_JLAB -e eic -q E1_JLAB -j unified -i PR -t -w generic
-            # --pilot-user epic --url https://pandaserver01.sdcc.bnl.gov -p 25443 -d
-            # --harvester-submit-mode PUSH --allow-same-user=False --job-type=test 
-            # --resource-type SCORE --pilotversion 3 --use-rucio
-            # -traces False --rucio-host https://nprucio01.sdcc.bnl.gov:443
-            pilot_args = pilot_args_template.format_map(core_utils.SafeDict(placeholder)).split()
-
-            remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
-            stdout_path = os.path.join(remote_worker_dir, "stdout.txt")
-            stderr_path = os.path.join(remote_worker_dir, "stderr.txt")
+            # remote_executable (e.g. examples/hpc/nersc/perlmutter_iri_main.sh) expects:
+            #   --input_archive <input_archive> --work_dir <work_dir> --log_dir <log_dir>
+            #   --batch_executable <batch_executable>
+            submit_args = (
+                f"--input_archive {remote_archive_path} --work_dir {remote_worker_dir} --log_dir {remote_log_dir} "
+                "--batch_executable executable_batch"
+            ).split()
 
             job_spec = {
                 "executable": self.remote_executable,
-                "arguments": pilot_args,
+                "arguments": submit_args,
                 "directory": remote_worker_dir,
-                "name": f"harvester-{harvester_config.master.harvester_id}-{workSpec.workerID}",
+                "name": f"{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
                 "stdout_path": stdout_path,
                 "stderr_path": stderr_path,
@@ -284,6 +282,21 @@ class IriSubmitter(PluginBase):
         request_walltime_minute = ceil(request_walltime / 60)
         request_cputime_minute = ceil(request_cputime / 60)
 
+        log_sub_dir = os.path.join(self.logDir, timeNow.strftime("%y-%m-%d_%H"))
+        if self.logBaseURL and self.logDir:
+            rel_stdout = os.path.relpath(os.path.join(log_sub_dir, f"{workspec.workerID}_stdout.txt"), self.logDir)
+            gtag = os.path.join(self.logBaseURL, rel_stdout)
+        else:
+            gtag = "unknown"
+
+        # The names below must match the arcname keys used to build the input archive in
+        # submit_workers, since that's the filename each ends up with after being untarred
+        # into work_dir on the remote resource (see the "Execution flow" comment there).
+        has_panda_token = bool(self.pandaTokenDir) and bool(self.pandaTokenFilename)
+        has_panda_token_key = bool(self.pandaTokenKeyFilename)
+        has_x509_proxy = bool(self.x509UserProxy)
+        remote_log_dir = os.path.join(self.remote_log_dir, str(workspec.workerID))
+
         placeholder_map = {
             "nCorePerNode": n_core_per_node,
             "nCorePerProcess": n_core_per_process,
@@ -307,10 +320,18 @@ class IriSubmitter(PluginBase):
             "pandaQueueName": panda_queue_name,
             "localQueueName": self.localQueueName,
             "logDir": self.logDir,
-            "logSubDir": os.path.join(self.logDir, timeNow.strftime("%y-%m-%d_%H")),
+            "logSubDir": log_sub_dir,
+            "gtag": gtag,
             "jobType": workspec.jobType,
             "prodSourceLabel": workspec.jobType,
             "pilotType": workspec.pilotType,
+            "work_dir": os.path.join(self.remote_work_dir, str(workspec.workerID)),
+            "remote_log_dir": remote_log_dir,
+            "pandaTokenFilename": "pandaTokenFilename" if has_panda_token else "",
+            "pandaTokenKeyFilename": "pandaTokenKeyFilename" if has_panda_token_key else "",
+            "x509UserProxy": "x509UserProxy" if has_x509_proxy else "",
+            "stdout_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stdout.txt"),
+            "stderr_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stderr.txt")
         }
         for k in ["tokenDir", "tokenName", "tokenOrigin", "submitMode"]:
             try:
@@ -320,14 +341,15 @@ class IriSubmitter(PluginBase):
         return placeholder_map
 
     # make batch script
-    def make_batch_script(self, workspec, logger):
+    def make_batch_script(self, workspec, placeholder, logger):
         # template for batch script
         with open(self.templateFile) as f:
             template = f.read()
         tmpFile = tempfile.NamedTemporaryFile(delete=False, suffix="_submit.sh", dir=workspec.get_access_point())
-        placeholder = self.make_placeholder_map(workspec, logger)
         tmpFile.write(str(template.format_map(core_utils.SafeDict(placeholder))).encode("latin_1"))
         tmpFile.close()
+        if self.iri_debug:
+            logger.debug(f"Rendered batch script {tmpFile.name} from template {self.templateFile}")
 
         # set execution bit and group permissions on the temp file
         st = os.stat(tmpFile.name)

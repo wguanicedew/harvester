@@ -32,6 +32,8 @@ class IriMonitor(PluginBase):
         else:
             self.htaccess_password = None
 
+        self.logDir = kwarg.get("logDir", None)
+
     def check_workers(self, workspec_list):
         retList = []
         for workSpec in workspec_list:
@@ -72,8 +74,8 @@ class IriMonitor(PluginBase):
                 tmpLog.debug(f"IRI job {job_id} status: {batchStatus}, exitCode: {exitCode}, mapped to workerStatus: {newStatus}")
                 tmpLog.debug(f"IRI job {job_id} download output through IRI: {self.download_transfer_output_through_iri}")
             if newStatus in _TERMINAL_STATUSES and not self.download_transfer_output_through_iri:
-                for filename in ("stdout.txt", "stderr.txt"):
-                    local_dest = os.path.join(workSpec.accessPoint, filename)
+                for filename in (f"{workSpec.workerID}_stdout.txt", f"{workSpec.workerID}_{workSpec.workerID}_stderr.txt"):
+                    local_dest = os.path.join(self.logDir, filename)
                     if os.path.exists(local_dest):
                         continue
                     remote_url = f"{self.remote_export_path.rstrip('/')}/{workSpec.workerID}/{filename}"

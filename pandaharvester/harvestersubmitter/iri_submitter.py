@@ -44,6 +44,8 @@ class IriSubmitter(PluginBase):
             raise ValueError("remote_log_dir must be specified in iri_submitter configuration")
         self.remote_export_path = kwarg.get("remote_export_path", None)
         self.remote_input_cache = kwarg.get("remote_input_cache", None)
+        # IRI rejects gpu_cores_per_process < 1, so omit it from job_spec unless set
+        self.gpu_cores_per_process = int(kwarg.get("gpu_cores_per_process", 0))
         self.htaccess_password = None
         if not self.remote_export_path:
             self.download_transfer_output_through_iri = True
@@ -160,7 +162,6 @@ class IriSubmitter(PluginBase):
                     "process_count": placeholder["nNode"] * placeholder["nProcessPerNode"],
                     "processes_per_node": placeholder["nProcessPerNode"],
                     "cpu_cores_per_process": placeholder["nCorePerProcess"],
-                    "gpu_cores_per_process": 0,
                     "exclusive_node_use": True,
                     "memory": int(placeholder["requestRamBytes"]) * placeholder["nCorePerNode"] * placeholder["nNode"] if placeholder["requestRamBytes"] else None,
                     "additionalProp1": {},
@@ -176,6 +177,8 @@ class IriSubmitter(PluginBase):
                 "post_launch": getattr(self, "post_launch", None),
                 "launcher": "single",  # single, mpirun, srun, aprun, jsrun
             }
+            if self.gpu_cores_per_process >= 1:
+                job_spec["resources"]["gpu_cores_per_process"] = self.gpu_cores_per_process
             custom_attributes = {}
             if getattr(self, "constraint", None) is not None:
                 custom_attributes["constraint"] = self.constraint

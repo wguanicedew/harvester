@@ -1,5 +1,5 @@
 {
-"NERSC_Perlmutter_IRI": {
+"ALCF_Crux_IRI": {
 	       "prodSourceLabel":"managed",
 	       "nQueueLimitJob":1,
 	       "nQueueLimitWorker":1,
@@ -14,8 +14,8 @@
 	"submitter":{
 			"module":"pandaharvester.harvestersubmitter.iri_submitter",
 			"name":"IriSubmitter",
-			"iri_resource_id":"59e80c79-4dfd-4c53-9c07-7405685fcd37",
-			"iri_config":"/opt/harvester/etc/panda/nersc_iri_config.yaml",
+			"iri_resource_id":"8b9b42f7-572a-4909-8472-a0453436304c",
+			"iri_config":"/opt/harvester/etc/panda/alcf_iri_config.yaml",
 			"iri_debug":true,
 			"noPilotsWhenNoActiveJobs":true,
 			"x509UserProxy":"/cephfs/atlpan/harvester/proxy/x509up_u25606_prod",
@@ -31,16 +31,14 @@
 			"nProcessPerNode": 4,
 			"duration":1800,
 			"constraint":"cpu",
-			"project":"m5037",
+			"project":"ATLAS_workflow_ALCF",
 			"remoteQueueName":"debug",
-			"templateFile":"/opt/harvester/sites/perlmutter_iri_submit_template.sh",
-			"remote_executable":"/global/cfs/cdirs/m5037/pilot_env/perlmutter_iri_main.sh",
-			"remote_work_dir":"/global/cfs/cdirs/m5037/work_dir",
-			"remote_log_dir":"/global/cfs/cdirs/m5037/www",
-			"remote_input_cache":"/global/cfs/cdirs/m5037/work_dir/input_cache",
-			"remote_export_path":"https://portal.nersc.gov/cfs/m5037/",
-			"htaccess_password":"",
-			"logDir":"/data/atlpan/job_logs",
+			"custom_attributes": {"filesystems": "home:eagle"},
+			"templateFile":"/opt/harvester/sites/crux_iri_submit_template.sh",
+			"remote_executable":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/crux_iri_main.sh",
+			"remote_work_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
+			"remote_log_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
+			"remote_input_cache":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/input_cache",
 			"logBaseURL":"https://aipanda176.cern.ch/job_logs"
 			},
 	"workerMaker":{
@@ -59,7 +57,7 @@
 	"monitor":{
 			"name":"IriMonitor",
 			"module":"pandaharvester.harvestermonitor.iri_monitor",
-			"iri_config":"/opt/harvester/etc/panda/nersc_iri_config.yaml",
+			"iri_config":"/opt/harvester/etc/panda/iri_config.yaml",
 			"iri_resource_id":"59e80c79-4dfd-4c53-9c07-7405685fcd37",
 			"iri_debug":true,
 			"remote_export_path":"https://portal.nersc.gov/cfs/m5037/",
@@ -68,7 +66,7 @@
 	"sweeper":{
 			"name":"IriSweeper",
 			"module":"pandaharvester.harvestersweeper.iri_sweeper",
-			"iri_config":"/opt/harvester/etc/panda/nersc_iri_config.yaml",
+			"iri_config":"/opt/harvester/etc/panda/iri_config.yaml",
 			"iri_resource_id":"59e80c79-4dfd-4c53-9c07-7405685fcd37",
 			"iri_debug":true
 			}

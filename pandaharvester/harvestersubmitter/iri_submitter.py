@@ -196,6 +196,9 @@ class IriSubmitter(PluginBase):
                 custom_attributes["volume"] = self.volume
             if custom_attributes:
                 job_spec["attributes"]["custom_attributes"] = custom_attributes
+            placeholder_custom_attributes = placeholder.get("custom_attributes", {})
+            if placeholder_custom_attributes:
+                job_spec["attributes"]["custom_attributes"] = {**job_spec["attributes"].get("custom_attributes", {}), **placeholder_custom_attributes}
 
             try:
                 if self.iri_debug:
@@ -250,7 +253,8 @@ class IriSubmitter(PluginBase):
 
         # get override requirements from queue configured
         try:
-            n_core_per_node = self.nCorePerNode if self.nCorePerNode else n_core_per_node_from_queue
+            nCorePerNode = getattr(self, "nCorePerNode", None)
+            n_core_per_node = nCorePerNode if nCorePerNode else n_core_per_node_from_queue
         except AttributeError:
             n_core_per_node = n_core_per_node_from_queue
         if not n_core_per_node:
@@ -261,13 +265,14 @@ class IriSubmitter(PluginBase):
         n_process_per_node = getattr(self, "nProcessPerNode", 1)
         n_core_per_process = n_core_per_node / n_process_per_node
 
-        n_core_total = self.nCore if self.nCore else n_core_per_node
+        n_node = getattr(self, "nNode", 1)
+
+        n_core_total = n_core_per_node * n_node
         n_core_total_factor = n_core_total * n_core_factor
         request_ram = max(workspec.minRamCount, 1 * n_core_total) if workspec.minRamCount else 1 * n_core_total
         request_disk = workspec.maxDiskCount * 1024 if workspec.maxDiskCount else 1
         request_walltime = workspec.maxWalltime if workspec.maxWalltime else 0
 
-        n_node = ceil(n_core_total / n_core_per_node)
         request_ram_factor = request_ram * n_core_factor
         request_ram_bytes = request_ram * (2**20)
         request_ram_bytes_factor = request_ram_bytes * n_core_factor
@@ -334,7 +339,8 @@ class IriSubmitter(PluginBase):
             "pandaTokenKeyFilename": "pandaTokenKeyFilename" if has_panda_token_key else "",
             "x509UserProxy": "x509UserProxy" if has_x509_proxy else "",
             "stdout_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stdout.txt"),
-            "stderr_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stderr.txt")
+            "stderr_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stderr.txt"),
+            "custom_attributes": getattr(self, "custom_attributes", {}),
         }
         for k in ["tokenDir", "tokenName", "tokenOrigin", "submitMode"]:
             try:

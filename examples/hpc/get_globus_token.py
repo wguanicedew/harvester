@@ -264,6 +264,7 @@ def get_tokens(facilities: List[str], token_file: Path | None = None, refresh_on
     client = globus_sdk.NativeAppAuthClient(client_id)
 
     token_file = token_file or default_token_file(facilities)
+    print(f"Using token file: {token_file}")
     stored = load_tokens(token_file)
     auth_data = None
     used_refresh = False

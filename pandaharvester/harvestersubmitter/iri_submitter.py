@@ -161,8 +161,8 @@ class IriSubmitter(PluginBase):
             ).split()
 
             job_spec = {
-                "executable": self.remote_executable,
-                "arguments": submit_args,
+                "executable": os.path.join(remote_worker_dir, "executable_batch"),  # remote_executable is already pre-deployed on the remote resource
+                "arguments": [],
                 "directory": remote_worker_dir,
                 "name": f"{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
@@ -186,7 +186,7 @@ class IriSubmitter(PluginBase):
                 },
                 "pre_launch": getattr(self, "pre_launch", None),
                 "post_launch": getattr(self, "post_launch", None),
-                "launcher": "single",  # single, mpirun, srun, aprun, jsrun
+                "launcher": getattr(self, "launcher", "srun"),  # single, mpirun, srun, aprun, jsrun
             }
             if self.gpu_cores_per_process >= 1:
                 job_spec["resources"]["gpu_cores_per_process"] = self.gpu_cores_per_process

@@ -247,6 +247,12 @@ def get_refresh_client_ids(facilities: List[str]) -> List[str]:
     return client_ids
 
 
+def default_token_file(facilities: List[str]) -> Path:
+    if len(facilities) == 1:
+        return Path.home() / ".globus" / f"{facilities[0]}_auth_tokens.json"
+    return Path.home() / ".globus" / "auth_tokens.json"
+
+
 def get_tokens(facilities: List[str], token_file: Path | None = None, refresh_only: bool = False, force_login: bool = False, prompt_login: bool = False) -> Dict:
     """Return token data dict. Raises RuntimeError on failure.
 
@@ -257,7 +263,7 @@ def get_tokens(facilities: List[str], token_file: Path | None = None, refresh_on
     client_id = get_client_id(facilities)
     client = globus_sdk.NativeAppAuthClient(client_id)
 
-    token_file = token_file or (Path.home() / ".globus" / "auth_tokens.json")
+    token_file = token_file or default_token_file(facilities)
     stored = load_tokens(token_file)
     auth_data = None
     used_refresh = False

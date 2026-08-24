@@ -56,9 +56,12 @@ class IriSubmitter(PluginBase):
                 with open(htaccess_password_file, "r") as f:
                     self.htaccess_password = f.read().strip()
 
+        iri_logger = self.make_logger(baseLogger, f"iri_submitter", method_name=None)
+
         self.iri_client = IriClient(config_path=self.iri_config,
                                     resource_id=self.iri_resource_id,
-                                    debug=self.iri_debug)
+                                    debug=self.iri_debug,
+                                    logger=iri_logger)
 
         if not hasattr(self, "localQueueName"):
             self.localQueueName = "debug"

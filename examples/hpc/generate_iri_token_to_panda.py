@@ -21,6 +21,13 @@ Two usage modes:
 Usage examples:
   python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --panda_secret_key NERSC_IRI_ACCESS
   python examples/generate_iri_token_to_panda.py --facilities nersc --force-login --panda_secret_key NERSC_IRI_ACCESS
+  python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri --panda_secret_key NERSC_IRI_ACCESS
+
+--validate-iri makes a lightweight authenticated GET call to an IRI endpoint
+(NERSC account/projects, or ALCF filesystem ls when --facilities alcf is used)
+to confirm the obtained token is actually accepted before it gets stored as a
+Panda secret. Override the endpoint with --iri-validate-url, or tune the ALCF
+default with --alcf-validate-resource-id / --alcf-validate-path.
 
 Exit codes: on refresh-only failure the script exits with non-zero status.
 """
@@ -30,7 +37,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from get_globus_token import get_tokens, get_facility_token
+from get_globus_token import ALCF_HOME_RESOURCE_ID, get_facility_token, get_tokens, get_validate_url, validate_iri_token
 
 try:
     # pandaclient is optional in examples; import when available
@@ -54,6 +61,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iri_config", type=Path, default=Path.cwd() / "iri_config.yaml", help="Path to also write iri_config.yaml")
     parser.add_argument("--base_url", default=DEFAULT_BASE_URL, help="IRI API base URL")
     parser.add_argument("--resource_id", default=DEFAULT_RESOURCE_ID, help="IRI resource ID")
+    parser.add_argument("--validate-iri", action="store_true", help="Validate the obtained token against an IRI endpoint before storing it")
+    parser.add_argument("--iri-validate-url", default=None, help="Explicit IRI GET endpoint used by --validate-iri. Defaults to NERSC account/projects for nersc and ALCF filesystem ls for alcf.")
+    parser.add_argument("--alcf-validate-resource-id", default=ALCF_HOME_RESOURCE_ID, help=f"ALCF resource_id used for the default --validate-iri filesystem ls (default: {ALCF_HOME_RESOURCE_ID}, Home)")
+    parser.add_argument("--alcf-validate-path", default=None, help="ALCF filesystem path used for the default --validate-iri filesystem ls (default: /home/$USER/)")
     return parser.parse_args()
 
 
@@ -87,6 +98,15 @@ def main() -> None:
     if not access_token:
         print("No access_token found in token data")
         sys.exit(3)
+
+    if args.validate_iri:
+        try:
+            validate_url = get_validate_url(facility, args.iri_validate_url, args.alcf_validate_resource_id, args.alcf_validate_path)
+            validate_iri_token(token_data, validate_url)
+        except RuntimeError as exc:
+            print(f"IRI token validation failed: {exc}")
+            sys.exit(7)
+        print(f"Validated token against the IRI API successfully ({validate_url}).")
 
     if Client is None:
         print("pandaclient not available; cannot set Panda secret. Install pandaclient or run this in an environment with it.")

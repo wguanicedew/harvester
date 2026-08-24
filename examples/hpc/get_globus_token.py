@@ -12,6 +12,9 @@ import json
 import os
 import stat
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -35,6 +38,11 @@ FACILITY_SCOPE_MAP = {
 }
 
 REQUIRED_SCOPES = {"openid", "profile", "email", "urn:globus:auth:scope:auth.globus.org:view_identities"}
+
+# --validate-iri support: default endpoints used to sanity-check a facility token.
+DEFAULT_IRI_VALIDATE_URL = "https://api.iri.nersc.gov/api/v1/account/projects"
+ALCF_BASE_URL = "https://api.alcf.anl.gov"
+ALCF_HOME_RESOURCE_ID = "6115bd2c-957a-4543-abff-5fae52992ff2"
 
 
 def ensure_private_parent_dir(path: Path) -> None:
@@ -74,6 +82,67 @@ def get_facility_token(token_data: Dict, facility: str) -> Dict:
         if scope in parse_scope_string(token.get("scope", "")):
             return token
     raise RuntimeError(f"Missing token for facility {facility}")
+
+
+def default_alcf_validate_path() -> str:
+    username = os.environ.get("USER") or os.environ.get("LOGNAME")
+    if not username:
+        raise RuntimeError("Could not determine a default ALCF validation path. Pass --alcf-validate-path /home/<username>/.")
+    return f"/home/{username}/"
+
+
+def build_alcf_ls_validate_url(resource_id: str, path: str) -> str:
+    quoted_resource_id = urllib.parse.quote(resource_id, safe="")
+    query = urllib.parse.urlencode({"path": path}, quote_via=urllib.parse.quote, safe="/")
+    return f"{ALCF_BASE_URL}/api/v1/filesystem/ls/{quoted_resource_id}?{query}"
+
+
+def get_validate_url(facility: str, iri_validate_url: Optional[str] = None, alcf_resource_id: str = ALCF_HOME_RESOURCE_ID, alcf_path: Optional[str] = None) -> str:
+    if iri_validate_url:
+        return iri_validate_url
+    if facility == "nersc":
+        return DEFAULT_IRI_VALIDATE_URL
+    if facility == "alcf":
+        path = alcf_path or default_alcf_validate_path()
+        return build_alcf_ls_validate_url(alcf_resource_id, path)
+    raise RuntimeError(f"No default validation endpoint for {facility}")
+
+
+def validate_iri_token(facility_token_data: Dict, validate_url: str):
+    """Call validate_url with the facility access token. Raises RuntimeError on failure."""
+    request = urllib.request.Request(
+        validate_url,
+        headers={
+            "accept": "application/json",
+            "Authorization": f"Bearer {facility_token_data['access_token']}",
+            "User-Agent": "iri-api-client/1.0",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            body = response.read().decode("utf-8")
+            data = json.loads(body) if body else {}
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8")
+        details = body.strip() or exc.reason
+        raise RuntimeError(f"IRI validation failed with HTTP {exc.code} from {validate_url}: {details}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"IRI validation request failed for {validate_url}: {exc.reason}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"IRI validation returned non-JSON data from {validate_url}") from exc
+
+    if isinstance(data, dict):
+        session_info = data.get("session_info")
+        if isinstance(session_info, dict):
+            authentications = session_info.get("authentications")
+            if isinstance(authentications, dict) and not authentications:
+                raise RuntimeError(
+                    "IRI validation succeeded but session_info.authentications is empty. "
+                    "Re-run with --force-login and use a Chrome incognito window."
+                )
+
+    return data
 
 
 def interactive_login(client: globus_sdk.NativeAppAuthClient, facilities: List[str], prompt_login: bool = False) -> Dict:

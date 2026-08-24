@@ -102,17 +102,15 @@ class IriSubmitter(PluginBase):
             #   0) create remote_worker_dir via the IRI filesystem API before submitting the job, so
             #      that job_spec["directory"] already exists when IRI chdir's into it for the
             #      "executable" step
-            #   1) build a tar archive here containing executable_batch (the batch script rendered
-            #      from templateFile), pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy and
-            #      pandaJobData.out
-            #   2) upload the archive to remote_input_cache on the remote resource
-            #   3) launch remote_executable (pre-deployed on the remote resource) as the job's
-            #      executable, with cwd set to remote_worker_dir (job_spec["directory"]), passing
-            #      --input_archive <remote_archive_path>
-            #   4) remote_executable copies the archive into that working directory and untars it there
-            #   5) remote_executable runs the extracted "executable_batch" script from that same
-            #      directory, so "$(pwd)/<name>" inside the batch script resolves to the other
-            #      extracted files (pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy)
+            #   1) upload each input file (executable_batch, the batch script rendered from
+            #      templateFile; pandaTokenFilename; pandaTokenKeyFilename; x509UserProxy;
+            #      pandaJobData.out) directly into remote_worker_dir, skipping any that don't
+            #      exist locally
+            #   2) launch remote_executable (pre-deployed on the remote resource) as the job's
+            #      executable, with cwd set to remote_worker_dir (job_spec["directory"])
+            #   3) remote_executable runs the "executable_batch" script from that same directory,
+            #      so "$(pwd)/<name>" inside the batch script resolves to the other uploaded files
+            #      (pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy)
             try:
                 ret = self.iri_client.mkdir(remote_worker_dir, resource_id=self.iri_resource_id, parents=True)
                 if self.iri_debug:
@@ -130,19 +128,14 @@ class IriSubmitter(PluginBase):
                               "pandaTokenKeyFilename": self.pandaTokenKeyFilename,
                               "x509UserProxy": self.x509UserProxy,
                               "pandaJobData.out": os.path.join(workSpec.accessPoint, "pandaJobData.out")}
-                archive_file = self.iri_client.create_input_archive(workSpec.accessPoint, input_maps)
-                if self.iri_debug:
-                    tmpLog.debug(f"Created input archive: {archive_file}")
-                if self.remote_input_cache:
-                    remote_input_cache = self.remote_input_cache
-                else:
-                    remote_input_cache = os.path.join(self.remote_work_dir, "input_cache")
-                archive_name = os.path.basename(archive_file)
-                remote_archive_name = f"{workSpec.workerID}_{archive_name}"
-                remote_archive_path = os.path.join(remote_input_cache, remote_archive_name)
-                ret = self.iri_client.upload(archive_file, remote_archive_path, resource_id=self.iri_resource_id)
-                if self.iri_debug:
-                    tmpLog.debug(f"Uploaded input archive {archive_file} to {remote_archive_path}: {ret}")
+                for remote_name, local_path in input_maps.items():
+                    if not local_path or not os.path.exists(local_path):
+                        tmpLog.debug(f"Skipping upload of {remote_name}: local path {local_path} does not exist")
+                        continue
+                    remote_path = os.path.join(remote_worker_dir, remote_name)
+                    ret = self.iri_client.upload(local_path, remote_path, resource_id=self.iri_resource_id)
+                    if self.iri_debug:
+                        tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {ret}")
             except IriClientError as e:
                 err = f"IRI prepare remote worker directory/inputs failed: {e}"
                 tmpLog.error(err)
@@ -155,12 +148,11 @@ class IriSubmitter(PluginBase):
             stderr_path = placeholder["stderr_path"]
 
             # remote_executable (e.g. examples/hpc/nersc/perlmutter_iri_main.sh) expects:
-            #   --input_archive <input_archive> --work_dir <work_dir> --log_dir <log_dir>
-            #   --batch_executable <batch_executable>
-            # It copies the archive into remote_worker_dir, untars it there, then runs the
-            # extracted "executable_batch" script itself from that same directory.
+            #   --work_dir <work_dir> --log_dir <log_dir> --batch_executable <batch_executable>
+            # Input files were already uploaded directly into remote_worker_dir above, so no
+            # --input_archive is passed and remote_executable skips the extraction step.
             submit_args = (
-                f"--input_archive {remote_archive_path} --work_dir {remote_worker_dir} --log_dir {remote_log_dir} "
+                f"--work_dir {remote_worker_dir} --log_dir {remote_log_dir} "
                 "--batch_executable executable_batch"
             ).split()
 

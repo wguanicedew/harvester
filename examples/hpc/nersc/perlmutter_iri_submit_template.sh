@@ -50,10 +50,15 @@ if [ -n "{pandaTokenFilename}" ] && [ -f "{pandaTokenFilename}" ] && [ -n "{pand
     export PANDA_AUTH_TOKEN=$(pwd)/{pandaTokenFilename}
     export PANDA_AUTH_TOKEN_KEY=$(pwd)/{pandaTokenKeyFilename}
     # export PANDA_AUTH_ID_TOKEN=$(cat $PANDA_AUTH_TOKEN)
-fi
-
-if [ -n "{x509UserProxy}" ] && [ -f "{x509UserProxy}" ]; then
-    export X509_USER_PROXY=$(pwd)/{x509UserProxy}
+    echo "Using PANDA_AUTH_TOKEN: $PANDA_AUTH_TOKEN"
+else
+    echo "PANDA_AUTH_TOKEN not found or not accessible"
+    if [ -n "{x509UserProxy}" ] && [ -f "{x509UserProxy}" ]; then
+        export X509_USER_PROXY=$(pwd)/{x509UserProxy}
+        echo "Using X509_USER_PROXY: $X509_USER_PROXY"
+    else
+        echo "X509_USER_PROXY not found or not accessible"
+    fi
 fi
 
 if [[ -n "${input_archive}" ]]; then

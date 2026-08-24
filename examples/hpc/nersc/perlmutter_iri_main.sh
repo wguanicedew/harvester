@@ -29,15 +29,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# This script runs once per task of the same job, so multiple copies race here
-# concurrently. Guard the (non-idempotent) setup below with a lock keyed on
-# work_dir plus a "done" marker, so mkdir/extract/log-dir-creation happen exactly
-# once no matter how many tasks invoke this script in parallel.
-lockfile="/tmp/$(basename "${work_dir}").iri_main.lock"
+# This script runs once per task of the same job, possibly on different nodes,
+# so multiple copies race here concurrently. mkdir -p is safe to run redundantly,
+# so do it upfront, then take the lock inside work_dir itself (on the shared
+# filesystem, unlike /tmp which is local to each node) plus a "done" marker, so
+# the rest of the setup (extract/log-dir-creation) happens exactly once.
+mkdir -p ${work_dir}
+lockfile="${work_dir}/.iri_main.lock"
 exec 200>"${lockfile}"
 flock 200
 if [[ ! -f "${lockfile}.done" ]]; then
-    mkdir -p ${work_dir}
     cd ${work_dir}
 
     if [[ -n "${input_archive}" ]]; then

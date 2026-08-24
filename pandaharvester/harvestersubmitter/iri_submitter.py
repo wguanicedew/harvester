@@ -136,6 +136,10 @@ class IriSubmitter(PluginBase):
                     ret = self.iri_client.upload(local_path, remote_path, resource_id=self.iri_resource_id)
                     if self.iri_debug:
                         tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {ret}")
+                    if remote_name == "executable_batch":
+                        ret = self.iri_client.chmod(remote_path, "0755", resource_id=self.iri_resource_id)
+                        if self.iri_debug:
+                            tmpLog.debug(f"Changed mode of {remote_path} to 0755: {ret}")
             except IriClientError as e:
                 err = f"IRI prepare remote worker directory/inputs failed: {e}"
                 tmpLog.error(err)

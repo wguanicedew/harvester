@@ -413,6 +413,28 @@ class IriClient:
             self._logger.debug(f"Changed ownership of {path} on {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
+    def chmod(self, path, mode, *, resource_id=None):
+        """Change the permission mode of a file or directory.
+
+        PUT /api/v1/filesystem/chmod/{resource_id}
+
+        Args:
+            path: Absolute path on the remote filesystem.
+            mode: New permission mode (e.g. ``"755"`` or ``"0755"``).
+            resource_id: Filesystem resource ID. Falls back to config ``resource_id``.
+
+        Returns:
+            Result object from the API.
+        """
+        rid = self._resource(resource_id)
+        url = f"{self._base_url}/api/v1/filesystem/chmod/{_encode(rid)}"
+        body = {"path": path, "mode": mode}
+        self._curl("PUT", url, json_body=body)
+        resp = self._session.put(url, json=body)
+        if self._logger:
+            self._logger.debug(f"Changed mode of {path} to {mode} on {url}: {resp.status_code} {resp.text}")
+        return self._fetch(resp)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

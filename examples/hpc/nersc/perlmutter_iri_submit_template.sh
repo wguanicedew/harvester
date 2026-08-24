@@ -45,10 +45,10 @@ export GTAG={gtag}
 export APFMON=http://apfmon.lancs.ac.uk/api
 export APFFID={harvesterID}
 
-if [ -n "{pandaTokenFilename}" ] && [ -f "{pandaTokenFilename}" ] && [ -n "{pandaTokenKeyFilename}" ] && [ -f "{pandaTokenKeyFilename}" ]; then
+if [ -n "{pandaTokenFilename}" ] && [ -f "{pandaTokenFilename}" ] && [ -n "{pandaTokenKeyPath}" ] && [ -f "{pandaTokenKeyPath}" ]; then
     export PANDA_AUTH_ORIGIN={tokenOrigin}
     export PANDA_AUTH_TOKEN=$(pwd)/{pandaTokenFilename}
-    export PANDA_AUTH_TOKEN_KEY=$(pwd)/{pandaTokenKeyFilename}
+    export PANDA_AUTH_TOKEN_KEY=$(pwd)/{pandaTokenKeyPath}
     # export PANDA_AUTH_ID_TOKEN=$(cat $PANDA_AUTH_TOKEN)
     echo "Using PANDA_AUTH_TOKEN: $PANDA_AUTH_TOKEN"
 else

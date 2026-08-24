@@ -47,10 +47,10 @@ export GTAG={gtag}
 export APFMON=http://apfmon.lancs.ac.uk/api
 export APFFID={harvesterID}
 
-if [ -n "{pandaTokenFilename}" ] && [ -f "{pandaTokenFilename}" ] && [ -n "{pandaTokenKeyFilename}" ] && [ -f "{pandaTokenKeyFilename}" ]; then
+if [ -n "{pandaTokenFilename}" ] && [ -f "{pandaTokenFilename}" ] && [ -n "{pandaTokenKeyPath}" ] && [ -f "{pandaTokenKeyPath}" ]; then
     export PANDA_AUTH_ORIGIN={tokenOrigin}
     export PANDA_AUTH_TOKEN=$(pwd)/{pandaTokenFilename}
-    export PANDA_AUTH_TOKEN_KEY=$(pwd)/{pandaTokenKeyFilename}
+    export PANDA_AUTH_TOKEN_KEY=$(pwd)/{pandaTokenKeyPath}
     # export PANDA_AUTH_ID_TOKEN=$(cat $PANDA_AUTH_TOKEN)
 fi
 
@@ -108,5 +108,5 @@ srun -N {nNode} python-mpi $PILOT_DIR/HPC/HPCJob.py \
     --dumpFormat json
 
 x509userproxy = {x509UserProxy}
-environment = "PANDA_JSID=harvester-{harvesterID} HARVESTER_ID={harvesterID} HARVESTER_WORKER_ID={workerID} GTAG={gtag} APFMON=http://apfmon.lancs.ac.uk/api APFFID={harvesterID} APFCID=$(Cluster).$(Process) PANDA_AUTH_ORIGIN=atlas.pilot PANDA_AUTH_TOKEN={pandaTokenFilename} PANDA_AUTH_TOKEN_KEY={pandaTokenKeyFilename}"
+environment = "PANDA_JSID=harvester-{harvesterID} HARVESTER_ID={harvesterID} HARVESTER_WORKER_ID={workerID} GTAG={gtag} APFMON=http://apfmon.lancs.ac.uk/api APFFID={harvesterID} APFCID=$(Cluster).$(Process) PANDA_AUTH_ORIGIN=atlas.pilot PANDA_AUTH_TOKEN={pandaTokenFilename} PANDA_AUTH_TOKEN_KEY={pandaTokenKeyPath}"
 transfer_input_files = {pandaTokenPath},{pandaTokenKeyPath}

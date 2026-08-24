@@ -35,10 +35,10 @@ class IriSubmitter(PluginBase):
 
         self.pandaTokenFilename = kwarg.get("pandaTokenFilename", None)
         self.pandaTokenDir = kwarg.get("pandaTokenDir", None)
-        self.pandaTokenKeyFilename = kwarg.get("pandaTokenKeyFilename", None)
+        self.pandaTokenKeyPath = kwarg.get("pandaTokenKeyPath", None)
         self.pandaAuthOrigin = kwarg.get("pandaAuthOrigin", None)
         self.x509UserProxy = kwarg.get("x509UserProxy", os.getenv("X509_USER_PROXY"))
-        
+
         self.templateFile = kwarg.get("templateFile", None)
         self.remoteQueueName = kwarg.get("remoteQueueName", None)
         self.duration = kwarg.get("duration", None)
@@ -113,20 +113,20 @@ class IriSubmitter(PluginBase):
             #      that job_spec["directory"] already exists when IRI chdir's into it for the
             #      "executable" step
             #   1) upload each input file (executable_batch, the batch script rendered from
-            #      templateFile; pandaTokenFilename; pandaTokenKeyFilename; x509UserProxy;
+            #      templateFile; pandaTokenFilename; pandaTokenKeyPath; x509UserProxy;
             #      pandaJobData.out) directly into remote_worker_dir, skipping any that don't
             #      exist locally
             #   2) launch remote_executable (pre-deployed on the remote resource) as the job's
             #      executable, with cwd set to remote_worker_dir (job_spec["directory"])
             #   3) remote_executable runs the "executable_batch" script from that same directory,
             #      so "$(pwd)/<name>" inside the batch script resolves to the other uploaded files
-            #      (pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy)
+            #      (pandaTokenFilename, pandaTokenKeyPath, x509UserProxy)
             try:
                 ret = self.iri_client.mkdir(remote_worker_dir, resource_id=self.iri_resource_id, parents=True)
                 if self.iri_debug:
                     tmpLog.debug(f"Created remote worker directory {remote_worker_dir}: {_mask_command(ret)}")
 
-                tmpLog.debug(f"pandaTokenDir: {self.pandaTokenDir}, pandaTokenFilename: {self.pandaTokenFilename}, pandaTokenKeyFilename: {self.pandaTokenKeyFilename}, x509UserProxy: {self.x509UserProxy}")
+                tmpLog.debug(f"pandaTokenDir: {self.pandaTokenDir}, pandaTokenFilename: {self.pandaTokenFilename}, pandaTokenKeyPath: {self.pandaTokenKeyPath}, x509UserProxy: {self.x509UserProxy}")
                 if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
                     token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
                     tmpLog.debug(f"Using token file: {token_file}")
@@ -135,7 +135,7 @@ class IriSubmitter(PluginBase):
                     tmpLog.debug("No token file specified")
                 input_maps = {"executable_batch": batchFile,
                               "pandaTokenFilename": token_file,
-                              "pandaTokenKeyFilename": self.pandaTokenKeyFilename,
+                              "pandaTokenKeyPath": self.pandaTokenKeyPath,
                               "x509UserProxy": self.x509UserProxy,
                               "pandaJobData.out": os.path.join(workSpec.accessPoint, "pandaJobData.out")}
                 for remote_name, local_path in input_maps.items():
@@ -320,7 +320,7 @@ class IriSubmitter(PluginBase):
         # submit_workers, since that's the filename each ends up with after being untarred
         # into work_dir on the remote resource (see the "Execution flow" comment there).
         has_panda_token = bool(self.pandaTokenDir) and bool(self.pandaTokenFilename)
-        has_panda_token_key = bool(self.pandaTokenKeyFilename)
+        has_panda_token_key = bool(self.pandaTokenKeyPath)
         has_x509_proxy = bool(self.x509UserProxy)
         remote_log_dir = os.path.join(self.remote_log_dir, str(workspec.workerID))
 
@@ -355,7 +355,7 @@ class IriSubmitter(PluginBase):
             "work_dir": os.path.join(self.remote_work_dir, str(workspec.workerID)),
             "remote_log_dir": remote_log_dir,
             "pandaTokenFilename": "pandaTokenFilename" if has_panda_token else "",
-            "pandaTokenKeyFilename": "pandaTokenKeyFilename" if has_panda_token_key else "",
+            "pandaTokenKeyPath": "pandaTokenKeyPath" if has_panda_token_key else "",
             "x509UserProxy": "x509UserProxy" if has_x509_proxy else "",
             "stdout_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stdout.txt"),
             "stderr_path": os.path.join(remote_log_dir, f"{workspec.workerID}_stderr.txt"),

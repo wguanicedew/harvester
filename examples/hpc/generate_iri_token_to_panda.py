@@ -22,12 +22,16 @@ Usage examples:
   python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --panda_secret_key NERSC_IRI_ACCESS
   python examples/generate_iri_token_to_panda.py --facilities nersc --force-login --panda_secret_key NERSC_IRI_ACCESS
   python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri --panda_secret_key NERSC_IRI_ACCESS
+  python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri
 
 --validate-iri makes a lightweight authenticated GET call to an IRI endpoint
 (NERSC account/projects, or ALCF filesystem ls when --facilities alcf is used)
-to confirm the obtained token is actually accepted before it gets stored as a
-Panda secret. Override the endpoint with --iri-validate-url, or tune the ALCF
-default with --alcf-validate-resource-id / --alcf-validate-path.
+to confirm the obtained token is actually accepted. Override the endpoint
+with --iri-validate-url, or tune the ALCF default with
+--alcf-validate-resource-id / --alcf-validate-path. --panda_secret_key is only
+required when you also want the token stored as a Panda secret; when using
+--validate-iri on its own, it can be omitted and the script exits after
+validating.
 
 Exit codes: on refresh-only failure the script exits with non-zero status.
 """
@@ -57,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--refresh-only", action="store_true", help="Cron job mode: only attempt refresh; exit non-zero with an error message if refresh fails, do not prompt for interactive login")
     parser.add_argument("--force-login", action="store_true", help="Interactive setup mode: force an interactive Globus login flow to (re)generate the saved token")
     parser.add_argument("--prompt-login", action="store_true", help="Add prompt=login to auth URL")
-    parser.add_argument("--panda_secret_key", required=True, help="Panda secret key name to set the access token under")
+    parser.add_argument("--panda_secret_key", default=None, help="Panda secret key name to set the access token under (not needed when only using --validate-iri)")
     parser.add_argument("--iri_config", type=Path, default=Path.cwd() / "iri_config.yaml", help="Path to also write iri_config.yaml")
     parser.add_argument("--base_url", default=DEFAULT_BASE_URL, help="IRI API base URL")
     parser.add_argument("--resource_id", default=DEFAULT_RESOURCE_ID, help="IRI resource ID")
@@ -65,7 +69,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iri-validate-url", default=None, help="Explicit IRI GET endpoint used by --validate-iri. Defaults to NERSC account/projects for nersc and ALCF filesystem ls for alcf.")
     parser.add_argument("--alcf-validate-resource-id", default=ALCF_HOME_RESOURCE_ID, help=f"ALCF resource_id used for the default --validate-iri filesystem ls (default: {ALCF_HOME_RESOURCE_ID}, Home)")
     parser.add_argument("--alcf-validate-path", default=None, help="ALCF filesystem path used for the default --validate-iri filesystem ls (default: /home/$USER/)")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.panda_secret_key and not args.validate_iri:
+        parser.error("--panda_secret_key is required unless --validate-iri is used")
+    return args
 
 
 IRI_CONFIG_TEMPLATE = """# IRI API client configuration
@@ -107,6 +114,9 @@ def main() -> None:
             print(f"IRI token validation failed: {exc}")
             sys.exit(7)
         print(f"Validated token against the IRI API successfully ({validate_url}).")
+
+    if not args.panda_secret_key:
+        return
 
     if Client is None:
         print("pandaclient not available; cannot set Panda secret. Install pandaclient or run this in an environment with it.")

@@ -1,4 +1,5 @@
 import os
+import shlex
 import stat
 import tempfile
 from math import ceil
@@ -174,7 +175,7 @@ class IriSubmitter(PluginBase):
                     "reservation_id": getattr(self, "reservation_id", None),
                     "additionalProp1": {}
                 },
-                "pre_launch": [self.remote_executable] + submit_args,
+                "pre_launch": shlex.join([self.remote_executable] + submit_args),
                 "post_launch": getattr(self, "post_launch", None),
                 "launcher": "single",  # single, mpirun, srun, aprun, jsrun
             }

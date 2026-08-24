@@ -1,5 +1,4 @@
 import os
-import shlex
 import stat
 import tempfile
 from math import ceil
@@ -97,21 +96,32 @@ class IriSubmitter(PluginBase):
 
             # Execution flow on the remote resource (see examples/hpc/nersc/perlmutter_iri_main.sh
             # and examples/hpc/nersc/perlmutter_iri_submit_template.sh for a concrete example):
+            #   0) create remote_worker_dir via the IRI filesystem API before submitting the job, so
+            #      that job_spec["directory"] already exists when IRI chdir's into it for the
+            #      "executable" step
             #   1) build a tar archive here containing executable_batch (the batch script rendered
             #      from templateFile), pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy and
             #      pandaJobData.out
             #   2) upload the archive to remote_input_cache on the remote resource
-            #   3) launch remote_executable (pre-deployed on the remote resource) with its cwd set to
-            #      remote_worker_dir (job_spec["directory"]), passing --input_archive <remote_archive_path>
+            #   3) launch remote_executable (pre-deployed on the remote resource) as the job's
+            #      executable, with cwd set to remote_worker_dir (job_spec["directory"]), passing
+            #      --input_archive <remote_archive_path>
             #   4) remote_executable copies the archive into that working directory and untars it there
             #   5) remote_executable runs the extracted "executable_batch" script from that same
             #      directory, so "$(pwd)/<name>" inside the batch script resolves to the other
             #      extracted files (pandaTokenFilename, pandaTokenKeyFilename, x509UserProxy)
             try:
+                ret = self.iri_client.mkdir(remote_worker_dir, resource_id=self.iri_resource_id, parents=True)
+                if self.iri_debug:
+                    tmpLog.debug(f"Created remote worker directory {remote_worker_dir}: {ret}")
+
+                tmpLog.debug(f"pandaTokenDir: {self.pandaTokenDir}, pandaTokenFilename: {self.pandaTokenFilename}, pandaTokenKeyFilename: {self.pandaTokenKeyFilename}, x509UserProxy: {self.x509UserProxy}")
                 if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
                     token_file = os.path.join(self.pandaTokenDir, self.pandaTokenFilename)
+                    tmpLog.debug(f"Using token file: {token_file}")
                 else:
                     token_file = None
+                    tmpLog.debug("No token file specified")
                 input_maps = {"executable_batch": batchFile,
                               "pandaTokenFilename": token_file,
                               "pandaTokenKeyFilename": self.pandaTokenKeyFilename,
@@ -131,11 +141,11 @@ class IriSubmitter(PluginBase):
                 if self.iri_debug:
                     tmpLog.debug(f"Uploaded input archive {archive_file} to {remote_archive_path}: {ret}")
             except IriClientError as e:
-                err = f"IRI upload inputs failed: {e}"
+                err = f"IRI prepare remote worker directory/inputs failed: {e}"
                 tmpLog.error(err)
                 retList.append((False, err))
                 continue
-            
+
             remote_log_dir = placeholder["remote_log_dir"]
             remote_worker_dir = placeholder["work_dir"]
             stdout_path = placeholder["stdout_path"]
@@ -144,16 +154,16 @@ class IriSubmitter(PluginBase):
             # remote_executable (e.g. examples/hpc/nersc/perlmutter_iri_main.sh) expects:
             #   --input_archive <input_archive> --work_dir <work_dir> --log_dir <log_dir>
             #   --batch_executable <batch_executable>
-            # It runs as a pre_launch step to stage remote_worker_dir (copy the archive there and
-            # untar it), so the actual job executable IRI launches is the extracted executable_batch.
+            # It copies the archive into remote_worker_dir, untars it there, then runs the
+            # extracted "executable_batch" script itself from that same directory.
             submit_args = (
                 f"--input_archive {remote_archive_path} --work_dir {remote_worker_dir} --log_dir {remote_log_dir} "
                 "--batch_executable executable_batch"
             ).split()
 
             job_spec = {
-                "executable": "executable_batch",
-                "arguments": [],
+                "executable": self.remote_executable,
+                "arguments": submit_args,
                 "directory": remote_worker_dir,
                 "name": f"{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
@@ -175,7 +185,7 @@ class IriSubmitter(PluginBase):
                     "reservation_id": getattr(self, "reservation_id", None),
                     "additionalProp1": {}
                 },
-                "pre_launch": shlex.join([self.remote_executable] + submit_args),
+                "pre_launch": getattr(self, "pre_launch", None),
                 "post_launch": getattr(self, "post_launch", None),
                 "launcher": "single",  # single, mpirun, srun, aprun, jsrun
             }

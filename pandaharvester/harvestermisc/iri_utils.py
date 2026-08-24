@@ -47,7 +47,7 @@ class IriClientError(Exception):
 class IriClient:
     """Synchronous IRI API client backed by a YAML config file."""
 
-    def __init__(self, config_path=None, *, base_url=None, access_token=None, resource_id=None, debug=False):
+    def __init__(self, config_path=None, *, base_url=None, access_token=None, resource_id=None, debug=False, logger=None):
         config = {}
         if config_path is not None or (base_url is None and access_token is None):
             config = _load_config(_resolve_config_path(config_path))
@@ -59,6 +59,8 @@ class IriClient:
         token = access_token or config.get("access_token")
         if token:
             self._session.headers["Authorization"] = f"Bearer {token}"
+
+        self._logger = logger
 
     # ------------------------------------------------------------------
     # Compute
@@ -80,6 +82,9 @@ class IriClient:
         url = f"{self._base_url}/api/v1/compute/job/{_encode(rid)}"
         self._curl("POST", url, json_body=job_spec)
         resp = self._session.post(url, json=job_spec)
+        if self._logger:
+            self._logger.debug(f"Submitted job to {url}: {job_spec}")
+            self._logger.debug(f"Response: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     def get_job(self, job_id, *, resource_id=None):
@@ -98,6 +103,8 @@ class IriClient:
         url = f"{self._base_url}/api/v1/compute/status/{_encode(rid)}/{_encode(job_id)}"
         self._curl("GET", url)
         resp = self._session.get(url)
+        if self._logger:
+            self._logger.debug(f"Retrieved job status for {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     def get_jobs(self, *, resource_id=None, filters=None, offset=None, limit=None, historical=False, include_spec=False):
@@ -129,6 +136,8 @@ class IriClient:
             params["include_spec"] = "true"
         self._curl("POST", url, params=params, json_body=filters or {})
         resp = self._session.post(url, params=params, json=filters)
+        if self._logger:
+            self._logger.debug(f"Retrieved jobs for {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     def cancel_job(self, job_id, *, resource_id=None):
@@ -147,6 +156,8 @@ class IriClient:
         url = f"{self._base_url}/api/v1/compute/cancel/{_encode(rid)}/{_encode(job_id)}"
         self._curl("DELETE", url)
         resp = self._session.delete(url)
+        if self._logger:
+            self._logger.debug(f"Cancelled job {job_id} on {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     # ------------------------------------------------------------------
@@ -175,10 +186,20 @@ class IriClient:
                 for name, file_path in inputs.items():
                     if file_path and os.path.exists(file_path):
                         tar.add(file_path, arcname=name)
+                        if self._logger:
+                            self._logger.debug(f"Added input file to archive: {name} -> {file_path}")
+                    else:
+                        if self._debug:
+                            print(f"# Skipping missing input file for archive: {name} -> {file_path}", file=sys.stderr)
             else:
                 for file_path in inputs:
                     if file_path and os.path.exists(file_path):
                         tar.add(file_path, arcname=os.path.basename(file_path))
+                        if self._logger:
+                            self._logger.debug(f"Added input file to archive: {file_path}")
+                    else:
+                        if self._debug:
+                            print(f"# Skipping missing input file for archive: {file_path}", file=sys.stderr)
         return archive_path
 
     # ------------------------------------------------------------------
@@ -227,6 +248,8 @@ class IriClient:
         url = f"{self._base_url}/api/v1/filesystem/stat/{_encode(rid)}"
         self._curl("GET", url, params=params)
         resp = self._session.get(url, params=params)
+        if self._logger:
+            self._logger.debug(f"Retrieved stat for {url}: {resp.status_code} {resp.text}") 
         return self._fetch(resp)
 
     def ls(self, path, *, resource_id=None, show_hidden=False, numeric_uid=False, recursive=False, dereference=False):
@@ -258,6 +281,8 @@ class IriClient:
         url = f"{self._base_url}/api/v1/filesystem/ls/{_encode(rid)}"
         self._curl("GET", url, params=params)
         resp = self._session.get(url, params=params)
+        if self._logger:
+            self._logger.debug(f"Retrieved directory listing for {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     def download(self, remote_path, local_dest, *, resource_id=None):
@@ -339,6 +364,8 @@ class IriClient:
         body = {"path": path, "parent": parents}
         self._curl("POST", url, json_body=body)
         resp = self._session.post(url, json=body)
+        if self._logger:
+            self._logger.debug(f"Created directory {path} on {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     def mv(self, path, target_path, *, resource_id=None):
@@ -359,6 +386,8 @@ class IriClient:
         body = {"path": path, "target_path": target_path}
         self._curl("POST", url, json_body=body)
         resp = self._session.post(url, json=body)
+        if self._logger:
+            self._logger.debug(f"Moved {path} to {target_path} on {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     def chown(self, path, *, resource_id=None, owner="", group=""):
@@ -380,6 +409,8 @@ class IriClient:
         body = {"path": path, "owner": owner, "group": group}
         self._curl("PUT", url, json_body=body)
         resp = self._session.put(url, json=body)
+        if self._logger:
+            self._logger.debug(f"Changed ownership of {path} on {url}: {resp.status_code} {resp.text}")
         return self._fetch(resp)
 
     # ------------------------------------------------------------------

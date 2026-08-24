@@ -27,6 +27,7 @@ export TZ=UTC0
 
 echo [$(date -u "+%m-%d-%y %H:%M:%S %Z")] Start_SLURM_Job
 
+cd {work_dir}
 
 export PANDA_QUEUE={pandaQueueName}
 export HARVESTER_DIR=/global/common/software/m2616/harvester-perlmutter/venv/py_3_13_11

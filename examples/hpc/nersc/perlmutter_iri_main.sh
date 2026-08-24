@@ -29,20 +29,33 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-mkdir -p ${work_dir}
-cd ${work_dir}
+# This script runs once per task of the same job, so multiple copies race here
+# concurrently. Guard the (non-idempotent) setup below with a lock keyed on
+# work_dir plus a "done" marker, so mkdir/extract/log-dir-creation happen exactly
+# once no matter how many tasks invoke this script in parallel.
+lockfile="/tmp/$(basename "${work_dir}").iri_main.lock"
+exec 200>"${lockfile}"
+flock 200
+if [[ ! -f "${lockfile}.done" ]]; then
+    mkdir -p ${work_dir}
+    cd ${work_dir}
 
-if [[ -n "${input_archive}" ]]; then
-    echo "Extracting input archive: ${input_archive} into ${work_dir}"
-    cp ${input_archive} ${work_dir}/
-    echo tar -xzf ${work_dir}/$(basename ${input_archive}) -C ${work_dir}
-    tar -xzf ${work_dir}/$(basename ${input_archive}) -C ${work_dir}
+    if [[ -n "${input_archive}" ]]; then
+        echo "Extracting input archive: ${input_archive} into ${work_dir}"
+        cp ${input_archive} ${work_dir}/
+        echo tar -xzf ${work_dir}/$(basename ${input_archive}) -C ${work_dir}
+        tar -xzf ${work_dir}/$(basename ${input_archive}) -C ${work_dir}
+    fi
+    if [[ -n "${log_dir}" ]]; then
+        echo "Creating log directory: ${log_dir}"
+        mkdir -p ${log_dir}
+        chmod -R a+rx ${log_dir}
+    fi
+    touch "${lockfile}.done"
 fi
-if [[ -n "${log_dir}" ]]; then
-    echo "Creating log directory: ${log_dir}"
-    mkdir -p ${log_dir}
-    chmod -R a+rx ${log_dir}
-fi
+flock -u 200
+
+cd ${work_dir}
 
 echo srun ${work_dir}/${batch_executable}
 srun ${work_dir}/${batch_executable}

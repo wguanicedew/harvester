@@ -85,31 +85,13 @@ cp -v $wrapper_wrapper_file $HARVESTER_ACCESS_POINT/wrapper-wrapper-3.sh
 #DPB_shifter srun --label -n $HARVESTER_NTASKS /usr/bin/shifter /bin/bash ./wrapper-wrapper-3-shifter.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
 #echo [$(date -u "+%m-%d-%y %H:%M:%S %Z")] srun --label -n $HARVESTER_NTASKS  /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
 #srun --label -n $HARVESTER_NTASKS  /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
-echo [$(date -u "+%m-%d-%y %H:%M:%S %Z")] srun --export=HARVESTER_ID,HARVESTER_WORKER_ID,PANDA_AUTH_ORIGIN,PANDA_AUTH_TOKEN --label -n $HARVESTER_NTASKS  /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
-srun --export=HARVESTER_ID,HARVESTER_WORKER_ID,PANDA_AUTH_ORIGIN,PANDA_AUTH_TOKEN --label -n $HARVESTER_NTASKS  /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
-wait
+# echo [$(date -u "+%m-%d-%y %H:%M:%S %Z")] srun --export=HARVESTER_ID,HARVESTER_WORKER_ID,PANDA_AUTH_ORIGIN,PANDA_AUTH_TOKEN --label -n $HARVESTER_NTASKS  /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
+# srun --export=HARVESTER_ID,HARVESTER_WORKER_ID,PANDA_AUTH_ORIGIN,PANDA_AUTH_TOKEN --label -n $HARVESTER_NTASKS  /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
+# wait
 
-chown -R :m2616 $HARVESTER_ACCESS_POINT
-
-
-
-#SBATCH -o {remote_log_dir}/stdout.txt
-#SBATCH -e {remote_log_dir}/stderr.txt
+/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
 
 
-export PROJ_DIR=/project/projectdirs/m5037
-source $PROJ_DIR/pilot/grid_env/setup.sh
 
-export PILOT_DIR=/global/cdf/cdir/m5037/
-export PYTHONPATH=$PILOT_DIR:$PYTHONPATH
 
-export WORK_DIR={accessPoint}
-cd $WORK_DIR
-
-srun -N {nNode} python-mpi $PILOT_DIR/HPC/HPCJob.py \
-    --globalWorkingDir=$WORK_DIR  --localWorkingDir=$WORK_DIR --dumpEventOutputs \
-    --dumpFormat json
-
-x509userproxy = {x509UserProxy}
-environment = "PANDA_JSID=harvester-{harvesterID} HARVESTER_ID={harvesterID} HARVESTER_WORKER_ID={workerID} GTAG={gtag} APFMON=http://apfmon.lancs.ac.uk/api APFFID={harvesterID} APFCID=$(Cluster).$(Process) PANDA_AUTH_ORIGIN=atlas.pilot PANDA_AUTH_TOKEN={pandaTokenFilename} PANDA_AUTH_TOKEN_KEY={pandaTokenKeyFilename}"
-transfer_input_files = {pandaTokenPath},{pandaTokenKeyPath}
+# chown -R :m2616 $HARVESTER_ACCESS_POINT

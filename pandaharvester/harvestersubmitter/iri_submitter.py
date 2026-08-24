@@ -83,11 +83,10 @@ class IriSubmitter(PluginBase):
         for workSpec in workspec_list:
             # make logger
             tmpLog = self.make_logger(baseLogger, f"workerID={workSpec.workerID}", method_name="submit_workers")
-            # set nCore
-            if self.nCore > 0:
-                workSpec.nCore = self.nCore
             # make batch script, here we create batch script at where harvester install
             placeholder = self.make_placeholder_map(workSpec, tmpLog)
+            # set nCore to the total core count across all nodes
+            workSpec.nCore = placeholder["nCorePerNode"] * placeholder["nNode"]
             batchFile = self.make_batch_script(workSpec, placeholder, tmpLog)
             remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
             if self.duration:
@@ -257,8 +256,6 @@ class IriSubmitter(PluginBase):
             n_core_per_node = nCorePerNode if nCorePerNode else n_core_per_node_from_queue
         except AttributeError:
             n_core_per_node = n_core_per_node_from_queue
-        if not n_core_per_node:
-            n_core_per_node = self.nCore
 
         n_core_factor = self.get_core_factor(workspec, logger)
 

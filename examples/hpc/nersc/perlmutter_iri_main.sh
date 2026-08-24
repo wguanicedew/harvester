@@ -44,6 +44,6 @@ if [[ -n "${log_dir}" ]]; then
     chmod -R a+rx ${log_dir}
 fi
 
-echo sbatch ${work_dir}/${batch_executable}
-sbatch ${work_dir}/${batch_executable}
+echo srun ${work_dir}/${batch_executable}
+srun ${work_dir}/${batch_executable}
 

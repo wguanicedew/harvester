@@ -143,14 +143,16 @@ class IriSubmitter(PluginBase):
             # remote_executable (e.g. examples/hpc/nersc/perlmutter_iri_main.sh) expects:
             #   --input_archive <input_archive> --work_dir <work_dir> --log_dir <log_dir>
             #   --batch_executable <batch_executable>
+            # It runs as a pre_launch step to stage remote_worker_dir (copy the archive there and
+            # untar it), so the actual job executable IRI launches is the extracted executable_batch.
             submit_args = (
                 f"--input_archive {remote_archive_path} --work_dir {remote_worker_dir} --log_dir {remote_log_dir} "
                 "--batch_executable executable_batch"
             ).split()
 
             job_spec = {
-                "executable": self.remote_executable,
-                "arguments": submit_args,
+                "executable": "executable_batch",
+                "arguments": [],
                 "directory": remote_worker_dir,
                 "name": f"{harvester_config.master.harvester_id}-{workSpec.workerID}",
                 "inherit_environment": True,
@@ -172,7 +174,7 @@ class IriSubmitter(PluginBase):
                     "reservation_id": getattr(self, "reservation_id", None),
                     "additionalProp1": {}
                 },
-                "pre_launch": getattr(self, "pre_launch", None),   # model load cvmfs
+                "pre_launch": [self.remote_executable] + submit_args,
                 "post_launch": getattr(self, "post_launch", None),
                 "launcher": "single",  # single, mpirun, srun, aprun, jsrun
             }

@@ -12,6 +12,16 @@ from pandaharvester.harvestermisc.iri_utils import IriClient, IriClientError
 baseLogger = core_utils.setup_logger("iri_submitter")
 
 
+def _mask_command(ret):
+    """Redact the API's echoed request ("command", which can embed a whole file's
+    base64 content for upload) from a log-friendly copy of an IriClient result."""
+    if isinstance(ret, dict) and "command" in ret:
+        masked = dict(ret)
+        masked["command"] = "<omitted>"
+        return masked
+    return ret
+
+
 # submitter for IRI API
 class IriSubmitter(PluginBase):
     # constructor
@@ -23,12 +33,12 @@ class IriSubmitter(PluginBase):
         self.iri_resource_id = kwarg.get("iri_resource_id")
         self.iri_debug = kwarg.get("iri_debug", False)
 
-        self.pandaTokenFilename = getattr(self, "pandaTokenFilename", None)
-        self.pandaTokenDir = getattr(self, "pandaTokenDir", None)
-        self.pandaTokenKeyFilename = getattr(self, "pandaTokenKeyFilename", None)
-        self.pandaAuthOrigin = getattr(self, "pandaAuthOrigin", None)
-        self.x509UserProxy = getattr(self, "x509UserProxy", os.getenv("X509_USER_PROXY"))
-
+        self.pandaTokenFilename = kwarg.get("pandaTokenFilename", None)
+        self.pandaTokenDir = kwarg.get("pandaTokenDir", None)
+        self.pandaTokenKeyFilename = kwarg.get("pandaTokenKeyFilename", None)
+        self.pandaAuthOrigin = kwarg.get("pandaAuthOrigin", None)
+        self.x509UserProxy = kwarg.get("x509UserProxy", os.getenv("X509_USER_PROXY"))
+        
         self.templateFile = kwarg.get("templateFile", None)
         self.remoteQueueName = kwarg.get("remoteQueueName", None)
         self.duration = kwarg.get("duration", None)
@@ -114,7 +124,7 @@ class IriSubmitter(PluginBase):
             try:
                 ret = self.iri_client.mkdir(remote_worker_dir, resource_id=self.iri_resource_id, parents=True)
                 if self.iri_debug:
-                    tmpLog.debug(f"Created remote worker directory {remote_worker_dir}: {ret}")
+                    tmpLog.debug(f"Created remote worker directory {remote_worker_dir}: {_mask_command(ret)}")
 
                 tmpLog.debug(f"pandaTokenDir: {self.pandaTokenDir}, pandaTokenFilename: {self.pandaTokenFilename}, pandaTokenKeyFilename: {self.pandaTokenKeyFilename}, x509UserProxy: {self.x509UserProxy}")
                 if self.pandaTokenDir is not None and self.pandaTokenFilename is not None:
@@ -135,11 +145,11 @@ class IriSubmitter(PluginBase):
                     remote_path = os.path.join(remote_worker_dir, remote_name)
                     ret = self.iri_client.upload(local_path, remote_path, resource_id=self.iri_resource_id)
                     if self.iri_debug:
-                        tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {ret}")
+                        tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {_mask_command(ret)}")
                     if remote_name == "executable_batch":
                         ret = self.iri_client.chmod(remote_path, "0755", resource_id=self.iri_resource_id)
                         if self.iri_debug:
-                            tmpLog.debug(f"Changed mode of {remote_path} to 0755: {ret}")
+                            tmpLog.debug(f"Changed mode of {remote_path} to 0755: {_mask_command(ret)}")
             except IriClientError as e:
                 err = f"IRI prepare remote worker directory/inputs failed: {e}"
                 tmpLog.error(err)

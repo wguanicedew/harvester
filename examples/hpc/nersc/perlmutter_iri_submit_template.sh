@@ -94,7 +94,7 @@ module load python/3.13-26.8.0
 
 env
 
-/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_\${SLURM_PROCID}: /"
+/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
 
 
 

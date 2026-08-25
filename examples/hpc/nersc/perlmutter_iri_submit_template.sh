@@ -100,9 +100,10 @@ echo "slurm cpus per task: $SLURM_CPUS_PER_TASK"
 
 # env
 
-# /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
+/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
 
-srun --export=ALL --label --ntasks=1 --cpus-per-task=$SLURM_CPUS_PER_TASK /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
+# not working with request node is busy
+# srun --export=ALL --label --ntasks=1 --cpus-per-task=$SLURM_CPUS_PER_TASK /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
 
 
 # chown -R :m2616 $HARVESTER_ACCESS_POINT

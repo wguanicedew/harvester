@@ -91,7 +91,7 @@ cp -v $wrapper_wrapper_file $HARVESTER_ACCESS_POINT/wrapper-wrapper-3.sh
 
 module load python/3.13-26.8.0
 
-/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT
+/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_\${SLURM_PROCID}: /"
 
 
 

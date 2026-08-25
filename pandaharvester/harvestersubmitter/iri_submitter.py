@@ -354,6 +354,7 @@ class IriSubmitter(PluginBase):
             "pilotType": workspec.pilotType,
             "work_dir": os.path.join(self.remote_work_dir, str(workspec.workerID)),
             "remote_log_dir": remote_log_dir,
+            "tokenOrigin": self.pandaAuthOrigin if self.pandaAuthOrigin else "",
             "pandaTokenFilename": "pandaTokenFilename" if has_panda_token else "",
             "pandaTokenKeyPath": "pandaTokenKeyPath" if has_panda_token_key else "",
             "x509UserProxy": "x509UserProxy" if has_x509_proxy else "",

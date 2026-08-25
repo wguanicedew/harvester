@@ -96,6 +96,7 @@ module load python/3.13-26.8.0
 
 echo "slurm job id: $SLURM_JOB_ID"
 echo "slurm proc id: $SLURM_PROCID"
+echo "slurm cpus per task: $SLURM_CPUS_PER_TASK"
 
 # env
 

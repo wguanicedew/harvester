@@ -94,11 +94,14 @@ cp -v $wrapper_wrapper_file $HARVESTER_ACCESS_POINT/wrapper-wrapper-3.sh
 
 module load python/3.13-26.8.0
 
+echo "slurm job id: $SLURM_JOB_ID"
+echo "slurm proc id: $SLURM_PROCID"
+
 # env
 
-/bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
+# /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
 
-
+srun --export=ALL --label --ntasks=1 --cpus-per-task=$SLURM_CPUS_PER_TASK /bin/bash ./wrapper-wrapper-3.sh $PANDA_QUEUE $HARVESTER_ACCESS_POINT | sed -e "s/^/pilot_${SLURM_PROCID}: /"
 
 
 # chown -R :m2616 $HARVESTER_ACCESS_POINT

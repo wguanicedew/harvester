@@ -94,9 +94,9 @@ cp -v $wrapper_wrapper_file $HARVESTER_ACCESS_POINT/wrapper-wrapper-3.sh
 
 module load python/3.13-26.8.0
 
-echo "slurm job id: $SLURM_JOB_ID"
-echo "slurm proc id: $SLURM_PROCID"
-echo "slurm cpus per task: $SLURM_CPUS_PER_TASK"
+echo "slurm job id: $SLURM_JOB_ID" | sed -e "s/^/pilot_${SLURM_PROCID}: /"
+echo "slurm proc id: $SLURM_PROCID" | sed -e "s/^/pilot_${SLURM_PROCID}: /"
+echo "slurm cpus per task: $SLURM_CPUS_PER_TASK" | sed -e "s/^/pilot_${SLURM_PROCID}: /"
 
 # env
 

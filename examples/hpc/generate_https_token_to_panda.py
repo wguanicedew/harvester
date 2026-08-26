@@ -16,11 +16,12 @@ This runs two interactive Globus login flows:
 
 The result is written to --output (default <site_name>_https_token.yaml):
 
+    client_id: <client_id>
     refresh_token: <refresh_token>
     https_server: <https_server_url>
 
 ...and also stored in Panda under --panda_secret_key as a JSON object:
-    {"refresh_token": <refresh_token>, "https_server": <https_server_url>}
+    {"client_id": <client_id>, "refresh_token": <refresh_token>, "https_server": <https_server_url>}
 
 Required packages:
   pip install panda-client globus-sdk
@@ -133,7 +134,7 @@ def main() -> None:
         print("No refresh_token found in token data")
         sys.exit(4)
 
-    content = f"refresh_token: {refresh_token}\nhttps_server: {https_server}\n"
+    content = f"client_id: {args.client_id}\nrefresh_token: {refresh_token}\nhttps_server: {https_server}\n"
     try:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(content, encoding="utf-8")
@@ -146,7 +147,7 @@ def main() -> None:
         print("pandaclient not available; cannot set Panda secret. Install pandaclient or run this in an environment with it.")
         sys.exit(6)
 
-    secret_value = json.dumps({"refresh_token": refresh_token, "https_server": https_server})
+    secret_value = json.dumps({"client_id": args.client_id, "refresh_token": refresh_token, "https_server": https_server})
     status, (success, message) = Client.set_user_secret(args.panda_secret_key, secret_value)
     if status != 0 or not success:
         print(f"Failed to set Panda secret: status={status} message={message}")

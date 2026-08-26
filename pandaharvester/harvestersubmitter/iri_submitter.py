@@ -50,8 +50,6 @@ class IriSubmitter(PluginBase):
         if not self.remote_work_dir:
             raise ValueError("remote_work_dir must be specified in iri_submitter configuration")
         self.remote_log_dir = kwarg.get("remote_log_dir", None)
-        if not self.remote_log_dir:
-            raise ValueError("remote_log_dir must be specified in iri_submitter configuration")
         self.remote_export_path = kwarg.get("remote_export_path", None)
         self.remote_input_cache = kwarg.get("remote_input_cache", None)
         # IRI rejects gpu_cores_per_process < 1, so omit it from job_spec unless set
@@ -93,6 +91,9 @@ class IriSubmitter(PluginBase):
     # submit workers
     def submit_workers(self, workspec_list):
         retList = []
+
+        self.iri_client.reload()  # refresh token may have changed on disk
+        
         for workSpec in workspec_list:
             # make logger
             tmpLog = self.make_logger(baseLogger, f"workerID={workSpec.workerID}", method_name="submit_workers")
@@ -322,7 +323,11 @@ class IriSubmitter(PluginBase):
         has_panda_token = bool(self.pandaTokenDir) and bool(self.pandaTokenFilename)
         has_panda_token_key = bool(self.pandaTokenKeyPath)
         has_x509_proxy = bool(self.x509UserProxy)
-        remote_log_dir = os.path.join(self.remote_log_dir, str(workspec.workerID))
+        remote_work_dir = os.path.join(self.remote_work_dir, str(workspec.workerID))
+        if self.remote_log_dir:
+             remote_log_dir = os.path.join(self.remote_log_dir, str(workspec.workerID))
+        else:
+             remote_log_dir = remote_work_dir
 
         placeholder_map = {
             "nCorePerNode": n_core_per_node,
@@ -352,7 +357,7 @@ class IriSubmitter(PluginBase):
             "jobType": workspec.jobType,
             "prodSourceLabel": workspec.jobType,
             "pilotType": workspec.pilotType,
-            "work_dir": os.path.join(self.remote_work_dir, str(workspec.workerID)),
+            "work_dir": remote_work_dir,
             "remote_log_dir": remote_log_dir,
             "tokenOrigin": self.pandaAuthOrigin if self.pandaAuthOrigin else "",
             "pandaTokenFilename": "pandaTokenFilename" if has_panda_token else "",

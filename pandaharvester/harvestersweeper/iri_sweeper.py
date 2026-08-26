@@ -26,6 +26,7 @@ class IriSweeper(BaseSweeper):
             tmpLog.debug(f"cancelling IRI job {job_id}")
 
         try:
+            self.iri_client.reload()  # refresh token may have changed on disk
             self.iri_client.cancel_job(job_id, resource_id=self.iri_resource_id)
         except IriClientError as e:
             errStr = f"Failed to cancel IRI job {job_id}: {e}"

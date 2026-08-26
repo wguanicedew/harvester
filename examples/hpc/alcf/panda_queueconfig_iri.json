@@ -37,9 +37,10 @@
 			"templateFile":"/opt/harvester/sites/crux_iri_submit_template.sh",
 			"remote_executable":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/crux_iri_main.sh",
 			"remote_work_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
-			"remote_log_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
+			"TOREMOVE_remote_log_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
 			"remote_input_cache":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/input_cache",
-			"logBaseURL":"https://aipanda176.cern.ch/job_logs"
+			"logBaseURL":"https://aipanda176.cern.ch/job_logs",
+			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_token.yaml"
 			},
 	"workerMaker":{
 			"name":"SimpleWorkerMaker",
@@ -60,8 +61,11 @@
 			"iri_config":"/opt/harvester/etc/panda/iri_config.yaml",
 			"iri_resource_id":"59e80c79-4dfd-4c53-9c07-7405685fcd37",
 			"iri_debug":true,
-			"remote_export_path":"https://portal.nersc.gov/cfs/m5037/",
-			"logDir":"/data/atlpan/job_logs"
+			"logDir":"/data/atlpan/job_logs",
+			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_token.yaml",
+			"remote_work_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
+			"download_logs":true,
+			"download_logs_method":"globus_https"
 			},
 	"sweeper":{
 			"name":"IriSweeper",

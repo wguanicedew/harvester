@@ -36,13 +36,14 @@
 			"templateFile":"/opt/harvester/sites/perlmutter_iri_submit_template.sh",
             "TOREMOVE_remote_executable":"/global/cfs/cdirs/m2616/harvester_workdir/pilot_env/perlmutter_iri_main.sh",
             "remote_work_dir": "/global/cfs/cdirs/m2616/harvester_workdir",
-            "remote_log_dir": "/global/cfs/cdirs/m2616/www/PanDA_logs/IRI",
+            "TOREMOVE_remote_log_dir": "/global/cfs/cdirs/m2616/www/PanDA_logs/IRI",
             "TOREMOVE_remote_input_cache": "/global/cfs/cdirs/m2616/harvester_workdir/input_cache",
             "TOREMOVE_remote_export_path1": "/global/cfs/cdirs/m2616/www",
             "TOREMOVE_remote_export_path": "https://portal.nersc.gov/cfs/m2616/PanDA_logs/IRI",
 			"TOREMOVE_htaccess_password":"",
 			"logDir":"/data/atlpan/job_logs",
-			"logBaseURL":"https://aipanda176.cern.ch/job_logs"
+			"logBaseURL":"https://aipanda176.cern.ch/job_logs",
+			"globus_https_config":"/opt/harvester/etc/panda/NERSC_https_token.yaml"
 			},
 	"workerMaker":{
 			"name":"SimpleWorkerMaker",
@@ -63,8 +64,12 @@
 			"iri_config":"/opt/harvester/etc/panda/nersc_iri_config.yaml",
 			"iri_resource_id":"59e80c79-4dfd-4c53-9c07-7405685fcd37",
 			"iri_debug":true,
-			"remote_export_path":"https://portal.nersc.gov/cfs/m5037/",
-			"logDir":"/data/atlpan/job_logs"
+			"TOREMOVE_remote_export_path":"https://portal.nersc.gov/cfs/m5037/",
+			"logDir":"/data/atlpan/job_logs",
+			"globus_https_config":"/opt/harvester/etc/panda/NERSC_https_token.yaml",
+			"remote_work_dir": "/global/cfs/cdirs/m2616/harvester_workdir",
+			"download_logs":true,
+			"download_logs_method":"globus_https"
 			},
 	"sweeper":{
 			"name":"IriSweeper",

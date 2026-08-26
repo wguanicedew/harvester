@@ -15,6 +15,7 @@ The refresh token is stored in Panda under --panda_secret_key, and also written
 (together with each discovered endpoint's https_server base URL) to --output
 (default ./globus_transfer.yaml), e.g.:
 
+    client_id: <client_id>
     refresh_token: <refresh_token>
     NERSC_https: <https_server_url>
     SDCC_https: <https_server_url>
@@ -158,7 +159,7 @@ def main() -> None:
         sys.exit(6)
     print(f"Set Panda user secret '{args.panda_secret_key}' successfully.")
 
-    lines = [f"refresh_token: {refresh_token}"]
+    lines = [f"client_id: {args.client_id}", f"refresh_token: {refresh_token}"]
     for label, info in endpoints.items():
         lines.append(f"{label}_https: {info['https_server']}")
     content = "\n".join(lines) + "\n"

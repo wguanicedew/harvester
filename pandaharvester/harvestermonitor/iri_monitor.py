@@ -3,7 +3,7 @@ import os
 from pandaharvester.harvestercore import core_utils
 from pandaharvester.harvestercore.plugin_base import PluginBase
 from pandaharvester.harvestercore.work_spec import WorkSpec
-from pandaharvester.harvestermisc.iri_utils import IriClient, IriClientError
+from pandaharvester.harvestermisc.iri_utils import GlobusClient, GlobusClientError, IriClient, IriClientError
 
 # logger
 baseLogger = core_utils.setup_logger("iri_monitor")
@@ -22,8 +22,16 @@ class IriMonitor(PluginBase):
         self.iri_debug = kwarg.get("iri_debug", False)
         self.iri_client = IriClient(config_path=self.iri_config, resource_id=self.iri_resource_id, debug=self.iri_debug)
 
+        self.remote_work_dir = kwarg.get("remote_work_dir", None)
+        self.remote_log_dir = kwarg.get("remote_log_dir", None)
         self.remote_export_path = kwarg.get("remote_export_path", None)
-        self.download_transfer_output_through_iri = not bool(self.remote_export_path)
+        self.download_logs = kwarg.get("download_logs", False)
+        self.download_logs_method = kwarg.get("download_logs_method", "globus_https")
+        self.globus_https_config = kwarg.get("globus_https_config", None)
+        self.globus_client = None
+        if self.download_logs and self.download_logs_method == "globus_https":
+            self.globus_client = GlobusClient(config_path=self.globus_https_config, debug=self.iri_debug)
+
         self.htaccess_username = kwarg.get("htaccess_username", None)
         htaccess_password_file = kwarg.get("htaccess_password", None)
         if htaccess_password_file:
@@ -36,6 +44,13 @@ class IriMonitor(PluginBase):
 
     def check_workers(self, workspec_list):
         retList = []
+
+
+        if self.download_logs_method == "globus_https":
+            self.globus_client.reload()  # refresh token may have changed on disk
+
+        self.iri_client.reload()  # refresh token may have changed on disk
+
         for workSpec in workspec_list:
             # make logger
             tmpLog = self.make_logger(baseLogger, f"workerID={workSpec.workerID}", method_name="check_workers")
@@ -72,18 +87,33 @@ class IriMonitor(PluginBase):
 
             if self.iri_debug:
                 tmpLog.debug(f"IRI job {job_id} status: {batchStatus}, exitCode: {exitCode}, mapped to workerStatus: {newStatus}")
-                tmpLog.debug(f"IRI job {job_id} download output through IRI: {self.download_transfer_output_through_iri}")
-            if newStatus in _TERMINAL_STATUSES and not self.download_transfer_output_through_iri:
+                tmpLog.debug(f"IRI job {job_id} download stdout/stderr through Gloubus HTTPS.")
+
+            if newStatus in _TERMINAL_STATUSES and self.download_logs:
+                if not self.remote_log_dir:
+                    remote_log_dir = os.path.join(self.remote_work_dir, workSpec.workerID)
+                else:
+                    remote_log_dir = os.path.join(self.remote_log_dir, workSpec.workerID)
+
                 for filename in (f"{workSpec.workerID}_stdout.txt", f"{workSpec.workerID}_{workSpec.workerID}_stderr.txt"):
+                    remote_file_path = os.path.join(remote_log_dir, filename)
                     local_dest = os.path.join(self.logDir, filename)
                     if os.path.exists(local_dest):
                         continue
-                    remote_url = f"{self.remote_export_path.rstrip('/')}/{workSpec.workerID}/{filename}"
-                    try:
-                        self.iri_client.download_from_http(remote_url, local_dest, username=self.htaccess_username, password=self.htaccess_password)
-                        tmpLog.debug(f"downloaded {filename} from {remote_url} to {local_dest}")
-                    except IriClientError as e:
-                        tmpLog.error(f"failed to download {filename} from {remote_url}: {e}")
+
+                    if self.download_logs_method == "globus_https":
+                        try:
+                            self.globus_client.download(remote_file_path, local_dest)
+                            tmpLog.debug(f"downloaded {filename} via Globus HTTPS from {remote_file_path} to {local_dest}")
+                        except GlobusClientError as e:
+                            tmpLog.error(f"failed to download {filename} via Globus HTTPS from {remote_file_path}: {e}")
+                    else:
+                        remote_url = f"{self.remote_export_path.rstrip('/')}/{workSpec.workerID}/{filename}"
+                        try:
+                            self.iri_client.download_from_http(remote_url, local_dest, username=self.htaccess_username, password=self.htaccess_password)
+                            tmpLog.debug(f"downloaded {filename} from {remote_url} to {local_dest}")
+                        except IriClientError as e:
+                            tmpLog.error(f"failed to download {filename} from {remote_url}: {e}")
 
             retList.append((newStatus, ""))
         return True, retList

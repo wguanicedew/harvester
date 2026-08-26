@@ -24,11 +24,13 @@ import time
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
+import globus_sdk
 import requests
 import yaml
 
 DEFAULT_BASE_URL = "https://api.iri.nersc.gov"
 _DEFAULT_CONFIG_PATH = Path.home() / ".iri.yaml"
+_DEFAULT_GLOBUS_HTTPS_CONFIG_PATH = Path.home() / ".globus_https.yaml"
 _TASK_TERMINAL_STATES = {"completed", "failed", "canceled"}
 _TASK_POLL_INTERVAL = 5  # seconds between task status polls
 _TASK_MAX_POLLS = 60  # ~5 minutes at 5s interval
@@ -45,22 +47,45 @@ class IriClientError(Exception):
 
 
 class IriClient:
-    """Synchronous IRI API client backed by a YAML config file."""
+    """Synchronous IRI API client backed by a YAML config file.
+
+    If a config file was used, call :meth:`reload` to re-read it later (e.g.
+    after a cron job has regenerated the access token) and refresh base_url,
+    resource_id and the Authorization header from whatever is currently on disk.
+    """
 
     def __init__(self, config_path=None, *, base_url=None, access_token=None, resource_id=None, debug=False, logger=None):
-        config = {}
-        if config_path is not None or (base_url is None and access_token is None):
-            config = _load_config(_resolve_config_path(config_path))
-        self._base_url = (base_url or config.get("base_url", DEFAULT_BASE_URL)).rstrip("/")
-        self._resource_id = resource_id or config.get("resource_id")
+        self._explicit_base_url = base_url
+        self._explicit_access_token = access_token
+        self._explicit_resource_id = resource_id
         self._debug = debug
+        self._logger = logger
         self._session = requests.Session()
         self._session.headers["Accept"] = "application/json"
-        token = access_token or config.get("access_token")
+        self._config_path = None
+        if config_path is not None or (base_url is None and access_token is None):
+            self._config_path = _resolve_config_path(config_path)
+        self._apply_config(_load_config(self._config_path) if self._config_path else {})
+
+    def _apply_config(self, config):
+        self._base_url = (self._explicit_base_url or config.get("base_url", DEFAULT_BASE_URL)).rstrip("/")
+        self._resource_id = self._explicit_resource_id or config.get("resource_id")
+        token = self._explicit_access_token or config.get("access_token")
         if token:
             self._session.headers["Authorization"] = f"Bearer {token}"
+        else:
+            self._session.headers.pop("Authorization", None)
 
-        self._logger = logger
+    def reload(self):
+        """Re-read the config file (if one was used) and refresh base_url,
+        resource_id and the access token accordingly.
+
+        No-op if this client was constructed without a config file (i.e. purely
+        from explicit keyword arguments).
+        """
+        if self._config_path is None:
+            return
+        self._apply_config(_load_config(self._config_path))
 
     # ------------------------------------------------------------------
     # Compute
@@ -486,6 +511,78 @@ class IriClient:
         return rid
 
 
+class GlobusClientError(Exception):
+    pass
+
+
+class GlobusClient:
+    """Downloads files over HTTPS from a Globus mapped collection, using a saved
+    refresh token (see examples/hpc/generate_https_token_to_panda.py).
+
+    Config file format (YAML), aka "globus_https_config":
+
+        client_id: <globus native app client id>
+        refresh_token: <refresh token scoped to the collection's https/data_access scopes>
+        https_server: <https base URL for the collection>
+
+    Config resolution order (when no path is passed to GlobusClient()):
+        1. explicit ``client_id``/``refresh_token``/``https_server`` keyword arguments
+        2. $GLOBUS_HTTPS_CONFIG environment variable
+        3. ~/.globus_https.yaml
+
+    If a config file was used, call :meth:`reload` to re-read it later (e.g. after
+    a cron job has regenerated the refresh token) and rebuild the authorizer with
+    whatever is currently on disk.
+    """
+
+    def __init__(self, config_path=None, *, client_id=None, refresh_token=None, https_server=None, debug=False):
+        self._explicit_client_id = client_id
+        self._explicit_refresh_token = refresh_token
+        self._explicit_https_server = https_server
+        self._debug = debug
+        self._config_path = None
+        if config_path is not None or (client_id is None and refresh_token is None):
+            self._config_path = _resolve_globus_https_config_path(config_path)
+        self._apply_config(_load_config(self._config_path, GlobusClientError) if self._config_path else {})
+
+    def _apply_config(self, config):
+        client_id = self._explicit_client_id or config.get("client_id")
+        refresh_token = self._explicit_refresh_token or config.get("refresh_token")
+        https_server = (self._explicit_https_server or config.get("https_server") or "").rstrip("/")
+        if not client_id or not refresh_token:
+            raise GlobusClientError("client_id and refresh_token are required; provide them as keyword arguments or set them in the config file")
+        if not https_server:
+            raise GlobusClientError("https_server is required; provide it as a keyword argument or set it in the config file")
+        self._client_id = client_id
+        self._refresh_token = refresh_token
+        self._https_server = https_server
+        auth_client = globus_sdk.NativeAppAuthClient(self._client_id)
+        self._authorizer = globus_sdk.RefreshTokenAuthorizer(self._refresh_token, auth_client)
+
+    def reload(self):
+        """Re-read the config file (if one was used) and rebuild the authorizer
+        from whatever client_id/refresh_token/https_server it now contains.
+
+        No-op if this client was constructed without a config file (i.e. purely
+        from explicit keyword arguments).
+        """
+        if self._config_path is None:
+            return
+        self._apply_config(_load_config(self._config_path, GlobusClientError))
+
+    def download(self, remote_file, local_file):
+        """Download remote_file from the collection's https_server to local_file."""
+        # self.reload()  # refresh token may have changed on disk
+        url = f"{self._https_server}/{str(remote_file).lstrip('/')}"
+        headers = {"Authorization": self._authorizer.get_authorization_header()}
+        if self._debug:
+            print(f"curl -s -H 'Authorization: <redacted>' -o {local_file} {url}", file=sys.stderr)
+        resp = requests.get(url, headers=headers, stream=True)
+        if resp.status_code >= 400:
+            raise GlobusClientError(f"HTTP {resp.status_code} downloading {url}: {resp.text}")
+        _stream_to_file(resp, local_file)
+
+
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
@@ -500,11 +597,20 @@ def _resolve_config_path(path):
     return _DEFAULT_CONFIG_PATH
 
 
-def _load_config(path):
+def _resolve_globus_https_config_path(path):
+    if path is not None:
+        return Path(path).expanduser()
+    env = os.environ.get("GLOBUS_HTTPS_CONFIG")
+    if env:
+        return Path(env).expanduser()
+    return _DEFAULT_GLOBUS_HTTPS_CONFIG_PATH
+
+
+def _load_config(path, error_cls=IriClientError):
     with open(path) as fh:
         data = yaml.safe_load(fh)
     if not isinstance(data, dict):
-        raise IriClientError(f"Config file '{path}' must be a YAML mapping")
+        raise error_cls(f"Config file '{path}' must be a YAML mapping")
     return data
 
 

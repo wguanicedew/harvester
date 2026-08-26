@@ -19,10 +19,10 @@ Two usage modes:
     consent URL and enter the authorization code.
 
 Usage examples:
-  python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --panda_secret_key NERSC_IRI_ACCESS
-  python examples/generate_iri_token_to_panda.py --facilities nersc --force-login --panda_secret_key NERSC_IRI_ACCESS
-  python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri --panda_secret_key NERSC_IRI_ACCESS
-  python examples/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri
+  python examples/hpc/generate_iri_token_to_panda.py --facilities nersc --refresh-only --panda_secret_key NERSC_IRI_ACCESS
+  python examples/hpc/generate_iri_token_to_panda.py --facilities nersc --force-login --panda_secret_key NERSC_IRI_ACCESS
+  python examples/hpc/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri --panda_secret_key NERSC_IRI_ACCESS
+  python examples/hpc/generate_iri_token_to_panda.py --facilities nersc --refresh-only --validate-iri
 
 --validate-iri makes a lightweight authenticated GET call to an IRI endpoint
 (NERSC account/projects, or ALCF filesystem ls when --facilities alcf is used)

@@ -116,6 +116,13 @@ def main() -> None:
         f"https://auth.globus.org/scopes/{collection_id}/https",
         f"https://auth.globus.org/scopes/{collection_id}/data_access",
     ]
+    print(
+        f"\nNOTE: please log in with the identity that has access to {args.site} for this step.\n"
+        f"If your Globus session is already authorized under a different site's login, the\n"
+        f"resulting token will not have permission to download files from {args.site}.\n"
+        "You may need to log out of Globus first (https://auth.globus.org/logout) before\n"
+        "opening the URL below, then log back in as the right identity.\n"
+    )
     try:
         token_response = interactive_login(client, scopes, refresh_tokens=True)
     except Exception as exc:

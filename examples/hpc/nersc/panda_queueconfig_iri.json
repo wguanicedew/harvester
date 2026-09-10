@@ -66,7 +66,7 @@
 			"iri_debug":true,
 			"TOREMOVE_remote_export_path":"https://portal.nersc.gov/cfs/m5037/",
 			"logDir":"/data/atlpan/job_logs",
-			"globus_https_config":"/opt/harvester/etc/panda/NERSC_https_token.yaml",
+			"globus_https_config":"/opt/harvester/etc/panda/NERSC_https_access_token.yaml",
 			"remote_work_dir": "/global/cfs/cdirs/m2616/harvester_workdir",
 			"download_logs":true,
 			"download_logs_method":"globus_https"

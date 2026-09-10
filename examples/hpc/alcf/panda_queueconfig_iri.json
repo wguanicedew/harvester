@@ -62,7 +62,7 @@
 			"iri_resource_id":"59e80c79-4dfd-4c53-9c07-7405685fcd37",
 			"iri_debug":true,
 			"logDir":"/data/atlpan/job_logs",
-			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_token.yaml",
+			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_access_token.yaml",
 			"remote_work_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
 			"download_logs":true,
 			"download_logs_method":"globus_https"

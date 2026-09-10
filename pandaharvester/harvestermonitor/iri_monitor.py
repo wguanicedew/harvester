@@ -24,6 +24,7 @@ class IriMonitor(PluginBase):
 
         self.remote_work_dir = kwarg.get("remote_work_dir", None)
         self.remote_log_dir = kwarg.get("remote_log_dir", None)
+
         self.download_logs = kwarg.get("download_logs", False)
         self.download_logs_method = kwarg.get("download_logs_method", "globus_https")
 
@@ -92,15 +93,16 @@ class IriMonitor(PluginBase):
 
             if self.iri_debug:
                 tmpLog.debug(f"IRI job {job_id} status: {batchStatus}, exitCode: {exitCode}, mapped to workerStatus: {newStatus}")
-                tmpLog.debug(f"IRI job {job_id} download stdout/stderr through Gloubus HTTPS.")
+                tmpLog.debug(f"IRI job {job_id} download stdout/stderr through {self.download_logs_method}.")
 
             if newStatus in _TERMINAL_STATUSES and self.download_logs:
+                worker_id = str(workSpec.workerID)
                 if not self.remote_log_dir:
-                    remote_log_dir = os.path.join(self.remote_work_dir, workSpec.workerID)
+                    remote_log_dir = os.path.join(self.remote_work_dir, worker_id)
                 else:
-                    remote_log_dir = os.path.join(self.remote_log_dir, workSpec.workerID)
+                    remote_log_dir = os.path.join(self.remote_log_dir, worker_id)
 
-                for filename in (f"{workSpec.workerID}_stdout.txt", f"{workSpec.workerID}_{workSpec.workerID}_stderr.txt"):
+                for filename in (f"{worker_id}_stdout.txt", f"{worker_id}_{worker_id}_stderr.txt"):
                     remote_file_path = os.path.join(remote_log_dir, filename)
                     local_dest = os.path.join(self.logDir, filename)
                     if os.path.exists(local_dest):
@@ -113,7 +115,7 @@ class IriMonitor(PluginBase):
                         except GlobusClientError as e:
                             tmpLog.error(f"failed to download {filename} via Globus HTTPS from {remote_file_path}: {e}")
                     else:
-                        remote_url = f"{self.remote_export_path.rstrip('/')}/{workSpec.workerID}/{filename}"
+                        remote_url = f"{self.remote_export_path.rstrip('/')}/{worker_id}/{filename}"
                         try:
                             self.iri_client.download_from_http(remote_url, local_dest, username=self.htaccess_username, password=self.htaccess_password)
                             tmpLog.debug(f"downloaded {filename} from {remote_url} to {local_dest}")

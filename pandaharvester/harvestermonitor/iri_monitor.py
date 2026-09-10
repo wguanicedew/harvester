@@ -1,3 +1,4 @@
+import json
 import os
 
 from pandaharvester.harvestercore import core_utils
@@ -10,6 +11,24 @@ baseLogger = core_utils.setup_logger("iri_monitor")
 
 # statuses for which the remote job has stopped running and its output, if any, is ready
 _TERMINAL_STATUSES = (WorkSpec.ST_finished, WorkSpec.ST_failed, WorkSpec.ST_cancelled)
+
+
+def _get_stdio_paths_from_job(job):
+    """Extract (stdout_path, stderr_path) from the batch scheduler's admincomment,
+    if the IRI job report includes it (e.g. Slurm's stdoutPath/stderrPath). Returns
+    (None, None) if unavailable or unparsable.
+    """
+    meta_data = (job.get("status") or {}).get("meta_data") or {}
+    admincomment = meta_data.get("admincomment")
+    if not admincomment:
+        return None, None
+    try:
+        comment = json.loads(admincomment) if isinstance(admincomment, str) else admincomment
+    except (TypeError, ValueError):
+        return None, None
+    if not isinstance(comment, dict):
+        return None, None
+    return comment.get("stdoutPath"), comment.get("stderrPath")
 
 
 # monitor for IRI API
@@ -102,8 +121,13 @@ class IriMonitor(PluginBase):
                 else:
                     remote_log_dir = os.path.join(self.remote_log_dir, worker_id)
 
-                for filename in (f"{worker_id}_stdout.txt", f"{worker_id}_{worker_id}_stderr.txt"):
-                    remote_file_path = os.path.join(remote_log_dir, filename)
+                stdout_path, stderr_path = _get_stdio_paths_from_job(job)
+                remote_paths = {
+                    f"{worker_id}_stdout.txt": stdout_path or os.path.join(remote_log_dir, f"{worker_id}_stdout.txt"),
+                    f"{worker_id}_stderr.txt": stderr_path or os.path.join(remote_log_dir, f"{worker_id}_stderr.txt"),
+                }
+
+                for filename, remote_file_path in remote_paths.items():
                     local_dest = os.path.join(self.logDir, filename)
                     if os.path.exists(local_dest):
                         continue

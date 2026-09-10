@@ -66,6 +66,8 @@ class IriMonitor(PluginBase):
                     self.htaccess_password = f.read().strip()
 
         self.logDir = kwarg.get("logDir", None)
+        if self.download_logs and self.logDir:
+            os.makedirs(self.logDir, exist_ok=True)
 
     def check_workers(self, workspec_list):
         retList = []
@@ -136,15 +138,15 @@ class IriMonitor(PluginBase):
                         try:
                             self.globus_client.download(remote_file_path, local_dest)
                             tmpLog.debug(f"downloaded {filename} via Globus HTTPS from {remote_file_path} to {local_dest}")
-                        except GlobusClientError as e:
-                            tmpLog.error(f"failed to download {filename} via Globus HTTPS from {remote_file_path}: {e}")
+                        except (GlobusClientError, OSError) as e:
+                            tmpLog.error(f"failed to download {filename} via Globus HTTPS from {remote_file_path} to {local_dest}: {e}")
                     else:
                         remote_url = f"{self.remote_export_path.rstrip('/')}/{worker_id}/{filename}"
                         try:
                             self.iri_client.download_from_http(remote_url, local_dest, username=self.htaccess_username, password=self.htaccess_password)
                             tmpLog.debug(f"downloaded {filename} from {remote_url} to {local_dest}")
-                        except IriClientError as e:
-                            tmpLog.error(f"failed to download {filename} from {remote_url}: {e}")
+                        except (IriClientError, OSError) as e:
+                            tmpLog.error(f"failed to download {filename} from {remote_url} to {local_dest}: {e}")
 
             retList.append((newStatus, ""))
         return True, retList

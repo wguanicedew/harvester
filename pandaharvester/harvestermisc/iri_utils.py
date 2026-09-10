@@ -517,47 +517,66 @@ class GlobusClientError(Exception):
 
 class GlobusClient:
     """Downloads files over HTTPS from a Globus mapped collection, using a saved
-    refresh token (see examples/hpc/generate_https_token_to_panda.py).
+    refresh or access token (see examples/hpc/generate_https_token_to_panda.py).
 
-    Config file format (YAML), aka "globus_https_config":
+    Config file format (YAML), aka "globus_https_config", is either:
 
         client_id: <globus native app client id>
         refresh_token: <refresh token scoped to the collection's https/data_access scopes>
         https_server: <https base URL for the collection>
 
+    or (as written by generate_https_token_to_panda.py's --generate_access_token /
+    --get_access_token, e.g. when the refresh token itself must stay off the
+    harvester machine):
+
+        client_id: <globus native app client id>
+        access_token: <short-lived access token scoped to the collection>
+        https_server: <https base URL for the collection>
+
+    If both are present, refresh_token takes precedence since it lets this client
+    renew its own access token; otherwise access_token is used as-is (call
+    :meth:`reload` periodically to pick up a fresh one from disk, e.g. after a
+    cron job has regenerated it).
+
     Config resolution order (when no path is passed to GlobusClient()):
-        1. explicit ``client_id``/``refresh_token``/``https_server`` keyword arguments
+        1. explicit ``client_id``/``refresh_token``/``access_token``/``https_server`` keyword arguments
         2. $GLOBUS_HTTPS_CONFIG environment variable
         3. ~/.globus_https.yaml
 
     If a config file was used, call :meth:`reload` to re-read it later (e.g. after
-    a cron job has regenerated the refresh token) and rebuild the authorizer with
+    a cron job has regenerated the token) and rebuild the authorizer with
     whatever is currently on disk.
     """
 
-    def __init__(self, config_path=None, *, client_id=None, refresh_token=None, https_server=None, debug=False):
+    def __init__(self, config_path=None, *, client_id=None, refresh_token=None, access_token=None, https_server=None, debug=False):
         self._explicit_client_id = client_id
         self._explicit_refresh_token = refresh_token
+        self._explicit_access_token = access_token
         self._explicit_https_server = https_server
         self._debug = debug
         self._config_path = None
-        if config_path is not None or (client_id is None and refresh_token is None):
+        if config_path is not None or (client_id is None and refresh_token is None and access_token is None):
             self._config_path = _resolve_globus_https_config_path(config_path)
         self._apply_config(_load_config(self._config_path, GlobusClientError) if self._config_path else {})
 
     def _apply_config(self, config):
         client_id = self._explicit_client_id or config.get("client_id")
         refresh_token = self._explicit_refresh_token or config.get("refresh_token")
+        access_token = self._explicit_access_token or config.get("access_token")
         https_server = (self._explicit_https_server or config.get("https_server") or "").rstrip("/")
-        if not client_id or not refresh_token:
-            raise GlobusClientError("client_id and refresh_token are required; provide them as keyword arguments or set them in the config file")
+        if not client_id or not (refresh_token or access_token):
+            raise GlobusClientError("client_id and either refresh_token or access_token are required; provide them as keyword arguments or set them in the config file")
         if not https_server:
             raise GlobusClientError("https_server is required; provide it as a keyword argument or set it in the config file")
         self._client_id = client_id
         self._refresh_token = refresh_token
+        self._access_token = access_token
         self._https_server = https_server
-        auth_client = globus_sdk.NativeAppAuthClient(self._client_id)
-        self._authorizer = globus_sdk.RefreshTokenAuthorizer(self._refresh_token, auth_client)
+        if refresh_token:
+            auth_client = globus_sdk.NativeAppAuthClient(self._client_id)
+            self._authorizer = globus_sdk.RefreshTokenAuthorizer(self._refresh_token, auth_client)
+        else:
+            self._authorizer = globus_sdk.AccessTokenAuthorizer(self._access_token)
 
     def reload(self):
         """Re-read the config file (if one was used) and rebuild the authorizer

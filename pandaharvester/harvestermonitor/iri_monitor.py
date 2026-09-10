@@ -24,21 +24,26 @@ class IriMonitor(PluginBase):
 
         self.remote_work_dir = kwarg.get("remote_work_dir", None)
         self.remote_log_dir = kwarg.get("remote_log_dir", None)
-        self.remote_export_path = kwarg.get("remote_export_path", None)
         self.download_logs = kwarg.get("download_logs", False)
         self.download_logs_method = kwarg.get("download_logs_method", "globus_https")
-        self.globus_https_config = kwarg.get("globus_https_config", None)
-        self.globus_client = None
-        if self.download_logs and self.download_logs_method == "globus_https":
-            self.globus_client = GlobusClient(config_path=self.globus_https_config, debug=self.iri_debug)
 
-        self.htaccess_username = kwarg.get("htaccess_username", None)
-        htaccess_password_file = kwarg.get("htaccess_password", None)
-        if htaccess_password_file:
-            with open(htaccess_password_file) as f:
-                self.htaccess_password = f.read().strip()
-        else:
-            self.htaccess_password = None
+        self.globus_https_config = None
+        self.globus_client = None
+        self.remote_export_path = None
+        self.htaccess_username = None
+        self.htaccess_password = None
+
+        if self.download_logs_method == "globus_https":
+            self.globus_https_config = kwarg.get("globus_https_config", None)
+            if self.download_logs:
+                self.globus_client = GlobusClient(config_path=self.globus_https_config, debug=self.iri_debug)
+        elif self.download_logs_method == "remote_export":
+            self.remote_export_path = kwarg.get("remote_export_path", None)
+            self.htaccess_username = kwarg.get("htaccess_username", None)
+            htaccess_password_file = kwarg.get("htaccess_password", None)
+            if htaccess_password_file:
+                with open(htaccess_password_file) as f:
+                    self.htaccess_password = f.read().strip()
 
         self.logDir = kwarg.get("logDir", None)
 

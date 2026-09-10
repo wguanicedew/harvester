@@ -1,33 +1,64 @@
 #!/usr/bin/env python3
-"""Generate a Globus HTTPS access token for a single HPC site and store it in Panda
-as a user secret.
+"""Manage a Globus HTTPS access token for a single HPC site across three steps.
 
 Unlike generate_transfer_token_to_panda.py (which builds one combined
-transfer.api.globus.org token covering several endpoints), this script targets a
-single site's Globus collection directly: the resulting refresh token's resource
-server is the collection ID itself, scoped only to that collection's "https" and
-"data_access" scopes.
+transfer.api.globus.org token covering several endpoints), this script targets
+a single site's Globus collection directly: the resulting token's resource
+server is the collection ID itself, scoped only to that collection's "https"
+and "data_access" scopes.
 
-This runs two interactive Globus login flows:
-  1) a basic transfer.api.globus.org login, used only to search the Transfer
-     service for the site's collection ID and https_server base URL
-  2) a second login requesting that collection's https/data_access scopes; the
-     refresh token from this second login is what gets stored
+1) --generate_refresh_token (run manually, interactively)
+   Runs two interactive Globus login flows:
+     a) a basic transfer.api.globus.org login, used only to search the
+        Transfer service for the site's collection ID and https_server base
+        URL
+     b) a second login requesting that collection's https/data_access
+        scopes; the refresh token from this second login is what gets
+        written
+   The resulting refresh token has a long lifetime and is written ONLY to
+   --output. It is never sent to Panda -- keep this file local and readable
+   only by its owner.
 
-The result is written to --output (default <site_name>_https_token.yaml):
+     python examples/hpc/generate_https_token_to_panda.py --generate_refresh_token --site NERSC \\
+         --output /opt/harvester/etc/panda/NERSC_https_refresh_token.yaml
+
+2) --generate_access_token (safe to run unattended, e.g. from cron)
+   Reads the refresh token from --input, exchanges it for a short-lived
+   Globus access token, writes the access token to --output, and uploads it
+   to Panda under --panda_secret_key. This can run on a private machine, or
+   directly on the harvester machine -- in which case --output can point at
+   the file harvester reads, and step 3 below is not needed.
+
+     python examples/hpc/generate_https_token_to_panda.py --generate_access_token --site NERSC \\
+         --input /opt/harvester/etc/panda/NERSC_https_refresh_token.yaml \\
+         --output /opt/harvester/etc/panda/NERSC_https_access_token.yaml \\
+         --panda_secret_key NERSC_HTTPS_TOKEN
+
+3) --get_access_token (run on the harvester machine)
+   Downloads the access token previously uploaded to Panda (in step 2) under
+   --panda_secret_key and writes it to --output.
+
+     python examples/hpc/generate_https_token_to_panda.py --get_access_token --site NERSC \\
+         --output /opt/harvester/etc/panda/NERSC_https_access_token.yaml \\
+         --panda_secret_key NERSC_HTTPS_TOKEN
+
+The refresh token file (step 1) looks like:
 
     client_id: <client_id>
     refresh_token: <refresh_token>
+    collection_id: <collection_uuid>
     https_server: <https_server_url>
 
-...and also stored in Panda under --panda_secret_key as a JSON object:
-    {"client_id": <client_id>, "refresh_token": <refresh_token>, "https_server": <https_server_url>}
+The access token file (steps 2 and 3) looks like:
+
+    client_id: <client_id>
+    access_token: <access_token>
+    expires_at: <unix_timestamp>
+    collection_id: <collection_uuid>
+    https_server: <https_server_url>
 
 Required packages:
   pip install panda-client globus-sdk
-
-Usage:
-  python examples/hpc/generate_https_token_to_panda.py --site NERSC --panda_secret_key NERSC_HTTPS_TOKEN
 """
 from __future__ import annotations
 
@@ -57,12 +88,24 @@ SITE_QUERIES = {
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate a Globus HTTPS access token for one site and store it in Panda user secrets")
-    parser.add_argument("--site", required=True, choices=sorted(SITE_QUERIES), help="Site to generate an https token for")
-    parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help="Globus native app client ID")
-    parser.add_argument("--panda_secret_key", required=True, help="Panda secret key name to store the token under")
-    parser.add_argument("--output", type=Path, default=None, help="Path to also write refresh_token/https_server (default <site>_https_token.yaml)")
-    return parser.parse_args()
+    parser = argparse.ArgumentParser(description="Generate/refresh a Globus HTTPS access token for one site and pass it through Panda user secrets")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--generate_refresh_token", action="store_true", help="Step 1 (manual, interactive): generate a long-lived refresh token and write it to --output. Never uploaded to Panda.")
+    mode.add_argument("--generate_access_token", action="store_true", help="Step 2 (can run unattended): read the refresh token from --input, exchange it for a short-lived access token, write it to --output, and upload it to Panda under --panda_secret_key.")
+    mode.add_argument("--get_access_token", action="store_true", help="Step 3 (run on the harvester machine): download the access token from Panda under --panda_secret_key and write it to --output.")
+
+    parser.add_argument("--site", required=True, choices=sorted(SITE_QUERIES), help="Site to manage an https token for")
+    parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help="Globus native app client ID (only used with --generate_refresh_token)")
+    parser.add_argument("--input", type=Path, default=None, help="Path to the refresh token yaml written by --generate_refresh_token (required for --generate_access_token)")
+    parser.add_argument("--panda_secret_key", default=None, help="Panda secret key name to store/retrieve the access token under (required for --generate_access_token and --get_access_token)")
+    parser.add_argument("--output", type=Path, default=None, help="Path to write the resulting yaml file (default depends on the selected step and --site)")
+    args = parser.parse_args()
+
+    if args.generate_access_token and args.input is None:
+        parser.error("--input is required with --generate_access_token")
+    if (args.generate_access_token or args.get_access_token) and not args.panda_secret_key:
+        parser.error("--panda_secret_key is required with --generate_access_token and --get_access_token")
+    return args
 
 
 def interactive_login(client, requested_scopes, *, refresh_tokens=False):
@@ -88,9 +131,30 @@ def find_collection(tc, query, pick=0, show_candidates=True):
     return results[pick]["id"]
 
 
-def main() -> None:
-    args = parse_args()
-    output = args.output or Path.cwd() / f"{args.site}_https_token.yaml"
+def read_key_value_yaml(path: Path) -> dict:
+    """Parse the flat 'key: value' yaml files written by this script."""
+    data = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        data[key.strip()] = value.strip()
+    return data
+
+
+def write_key_value_yaml(path: Path, data: dict) -> None:
+    lines = [f"{key}: {value}" for key, value in data.items()]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def default_output(site: str, suffix: str) -> Path:
+    return Path.cwd() / f"{site}_https_{suffix}.yaml"
+
+
+def cmd_generate_refresh_token(args: argparse.Namespace) -> None:
+    output = args.output or default_output(args.site, "refresh_token")
     query, pick = SITE_QUERIES[args.site]
     client = globus_sdk.NativeAppAuthClient(args.client_id)
 
@@ -134,11 +198,48 @@ def main() -> None:
         print("No refresh_token found in token data")
         sys.exit(4)
 
-    content = f"client_id: {args.client_id}\nrefresh_token: {refresh_token}\nhttps_server: {https_server}\n"
+    data = {"client_id": args.client_id, "refresh_token": refresh_token, "collection_id": collection_id, "https_server": https_server}
     try:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(content, encoding="utf-8")
-        print(f"Wrote {output}")
+        write_key_value_yaml(output, data)
+        print(f"Wrote refresh token to {output}. Keep this file local; it is not uploaded to Panda.")
+    except Exception as exc:
+        print(f"Failed to write {output}: {exc}")
+        sys.exit(5)
+
+
+def cmd_generate_access_token(args: argparse.Namespace) -> None:
+    output = args.output or default_output(args.site, "access_token")
+
+    try:
+        refresh_data = read_key_value_yaml(args.input)
+    except Exception as exc:
+        print(f"Failed to read {args.input}: {exc}")
+        sys.exit(1)
+    client_id = refresh_data.get("client_id")
+    refresh_token = refresh_data.get("refresh_token")
+    collection_id = refresh_data.get("collection_id")
+    https_server = refresh_data.get("https_server")
+    if not client_id or not refresh_token or not collection_id:
+        print(f"{args.input} is missing client_id, refresh_token, or collection_id")
+        sys.exit(2)
+
+    client = globus_sdk.NativeAppAuthClient(client_id)
+    try:
+        token_response = client.oauth2_refresh_token(refresh_token)
+    except Exception as exc:
+        print(f"Error refreshing https token: {exc}")
+        sys.exit(3)
+    token_data = token_response.by_resource_server.get(collection_id, {})
+    access_token = token_data.get("access_token")
+    if not access_token:
+        print("No access_token found in refreshed token data")
+        sys.exit(4)
+    expires_at = token_data.get("expires_at_seconds")
+
+    data = {"client_id": client_id, "access_token": access_token, "expires_at": expires_at, "collection_id": collection_id, "https_server": https_server}
+    try:
+        write_key_value_yaml(output, data)
+        print(f"Wrote access token to {output}")
     except Exception as exc:
         print(f"Failed to write {output}: {exc}")
         sys.exit(5)
@@ -147,12 +248,52 @@ def main() -> None:
         print("pandaclient not available; cannot set Panda secret. Install pandaclient or run this in an environment with it.")
         sys.exit(6)
 
-    secret_value = json.dumps({"client_id": args.client_id, "refresh_token": refresh_token, "https_server": https_server})
+    secret_value = json.dumps(data)
     status, (success, message) = Client.set_user_secret(args.panda_secret_key, secret_value)
     if status != 0 or not success:
         print(f"Failed to set Panda secret: status={status} message={message}")
         sys.exit(7)
     print(f"Set Panda user secret '{args.panda_secret_key}' successfully.")
+
+
+def cmd_get_access_token(args: argparse.Namespace) -> None:
+    output = args.output or default_output(args.site, "access_token")
+
+    if Client is None:
+        print("pandaclient not available; cannot get Panda secret. Install pandaclient or run this in an environment with it.")
+        sys.exit(1)
+
+    status, (success, secrets) = Client.get_user_secrets()
+    if status != 0 or not success:
+        print(f"Failed to get Panda user secrets: status={status} data={secrets}")
+        sys.exit(2)
+
+    raw = secrets.get(args.panda_secret_key)
+    if not raw:
+        print(f"Panda secret '{args.panda_secret_key}' is empty")
+        sys.exit(3)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f"Panda secret '{args.panda_secret_key}' is not valid JSON: {exc}")
+        sys.exit(4)
+
+    try:
+        write_key_value_yaml(output, payload)
+        print(f"Wrote access token to {output}")
+    except Exception as exc:
+        print(f"Failed to write {output}: {exc}")
+        sys.exit(5)
+
+
+def main() -> None:
+    args = parse_args()
+    if args.generate_refresh_token:
+        cmd_generate_refresh_token(args)
+    elif args.generate_access_token:
+        cmd_generate_access_token(args)
+    elif args.get_access_token:
+        cmd_get_access_token(args)
 
 
 if __name__ == "__main__":

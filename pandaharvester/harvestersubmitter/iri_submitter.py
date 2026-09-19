@@ -47,9 +47,13 @@ class IriSubmitter(PluginBase):
         if not self.remote_executable:
             raise ValueError("remote_executable must be specified in iri_submitter configuration")
         self.remote_work_dir = kwarg.get("remote_work_dir", None)
+        self.remote_work_dir_resource_id = kwarg.get("remote_work_dir_resource_id", None)
         if not self.remote_work_dir:
             raise ValueError("remote_work_dir must be specified in iri_submitter configuration")
         self.remote_log_dir = kwarg.get("remote_log_dir", None)
+        self.remote_log_dir_resource_id = kwarg.get("remote_log_dir_resource_id", None)
+        if not self.remote_log_dir_resource_id:
+            self.remote_log_dir_resource_id = self.remote_work_dir_resource_id
         self.remote_export_path = kwarg.get("remote_export_path", None)
         self.remote_input_cache = kwarg.get("remote_input_cache", None)
         # IRI rejects gpu_cores_per_process < 1, so omit it from job_spec unless set
@@ -123,7 +127,7 @@ class IriSubmitter(PluginBase):
             #      so "$(pwd)/<name>" inside the batch script resolves to the other uploaded files
             #      (pandaTokenFilename, pandaTokenKeyPath, x509UserProxy)
             try:
-                ret = self.iri_client.mkdir(remote_worker_dir, resource_id=self.iri_resource_id, parents=True)
+                ret = self.iri_client.mkdir(remote_worker_dir, resource_id=self.remote_work_dir_resource_id, parents=True)
                 if self.iri_debug:
                     tmpLog.debug(f"Created remote worker directory {remote_worker_dir}: {_mask_command(ret)}")
 
@@ -144,11 +148,11 @@ class IriSubmitter(PluginBase):
                         tmpLog.debug(f"Skipping upload of {remote_name}: local path {local_path} does not exist")
                         continue
                     remote_path = os.path.join(remote_worker_dir, remote_name)
-                    ret = self.iri_client.upload(local_path, remote_path, resource_id=self.iri_resource_id)
+                    ret = self.iri_client.upload(local_path, remote_path, resource_id=self.remote_work_dir_resource_id)
                     if self.iri_debug:
                         tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {_mask_command(ret)}")
                     if remote_name == "executable_batch":
-                        ret = self.iri_client.chmod(remote_path, "0755", resource_id=self.iri_resource_id)
+                        ret = self.iri_client.chmod(remote_path, "0755", resource_id=self.remote_work_dir_resource_id)
                         if self.iri_debug:
                             tmpLog.debug(f"Changed mode of {remote_path} to 0755: {_mask_command(ret)}")
             except IriClientError as e:

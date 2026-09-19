@@ -6,7 +6,7 @@ from math import ceil
 from pandaharvester.harvesterconfig import harvester_config
 from pandaharvester.harvestercore import core_utils
 from pandaharvester.harvestercore.plugin_base import PluginBase
-from pandaharvester.harvestermisc.iri_utils import IriClient, IriClientError
+from pandaharvester.harvestermisc.iri_utils import GlobusClient, GlobusClientError, IriClient, IriClientError
 
 # logger
 baseLogger = core_utils.setup_logger("iri_submitter")
@@ -56,6 +56,13 @@ class IriSubmitter(PluginBase):
             self.remote_log_dir_resource_id = self.remote_work_dir_resource_id
         self.remote_export_path = kwarg.get("remote_export_path", None)
         self.remote_input_cache = kwarg.get("remote_input_cache", None)
+        self.upload_method = kwarg.get("upload_method", "iri")
+        if self.upload_method not in ("iri", "globus_https"):
+            raise ValueError(f"Unsupported upload_method '{self.upload_method}'; must be 'iri' or 'globus_https'")
+        self.globus_client = None
+        if self.upload_method == "globus_https":
+            self.globus_https_config = kwarg.get("globus_https_config", None)
+            self.globus_client = GlobusClient(config_path=self.globus_https_config, debug=self.iri_debug)
         # IRI rejects gpu_cores_per_process < 1, so omit it from job_spec unless set
         self.gpu_cores_per_process = int(kwarg.get("gpu_cores_per_process", 0))
         self.htaccess_password = None
@@ -97,7 +104,9 @@ class IriSubmitter(PluginBase):
         retList = []
 
         self.iri_client.reload()  # refresh token may have changed on disk
-        
+        if self.globus_client is not None:
+            self.globus_client.reload()  # refresh token may have changed on disk
+
         for workSpec in workspec_list:
             # make logger
             tmpLog = self.make_logger(baseLogger, f"workerID={workSpec.workerID}", method_name="submit_workers")
@@ -148,14 +157,19 @@ class IriSubmitter(PluginBase):
                         tmpLog.debug(f"Skipping upload of {remote_name}: local path {local_path} does not exist")
                         continue
                     remote_path = os.path.join(remote_worker_dir, remote_name)
-                    ret = self.iri_client.upload(local_path, remote_path, resource_id=self.remote_work_dir_resource_id)
-                    if self.iri_debug:
-                        tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {_mask_command(ret)}")
+                    if self.upload_method == "globus_https":
+                        self.globus_client.upload(local_path, remote_path)
+                        if self.iri_debug:
+                            tmpLog.debug(f"Uploaded {local_path} to {remote_path} via Globus HTTPS")
+                    else:
+                        ret = self.iri_client.upload(local_path, remote_path, resource_id=self.remote_work_dir_resource_id)
+                        if self.iri_debug:
+                            tmpLog.debug(f"Uploaded {local_path} to {remote_path}: {_mask_command(ret)}")
                     if remote_name == "executable_batch":
                         ret = self.iri_client.chmod(remote_path, "0755", resource_id=self.remote_work_dir_resource_id)
                         if self.iri_debug:
                             tmpLog.debug(f"Changed mode of {remote_path} to 0755: {_mask_command(ret)}")
-            except IriClientError as e:
+            except (IriClientError, GlobusClientError) as e:
                 err = f"IRI prepare remote worker directory/inputs failed: {e}"
                 tmpLog.error(err)
                 retList.append((False, err))

@@ -601,6 +601,22 @@ class GlobusClient:
             raise GlobusClientError(f"HTTP {resp.status_code} downloading {url}: {resp.text}")
         _stream_to_file(resp, local_file)
 
+    def upload(self, local_file, remote_file):
+        """Upload local_file to remote_file on the collection's https_server.
+
+        Requires the token/authorizer to be scoped for write access and the
+        collection ACL to grant write permission on remote_file's path.
+        """
+        # self.reload()  # refresh token may have changed on disk
+        url = f"{self._https_server}/{str(remote_file).lstrip('/')}"
+        headers = {"Authorization": self._authorizer.get_authorization_header()}
+        if self._debug:
+            print(f"curl -s -X PUT -H 'Authorization: <redacted>' -T {local_file} {url}", file=sys.stderr)
+        with open(local_file, "rb") as fh:
+            resp = requests.put(url, headers=headers, data=fh)
+        if resp.status_code >= 400:
+            raise GlobusClientError(f"HTTP {resp.status_code} uploading {url}: {resp.text}")
+
 
 # ---------------------------------------------------------------------------
 # Module-level helpers

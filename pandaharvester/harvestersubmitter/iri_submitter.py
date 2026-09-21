@@ -46,7 +46,16 @@ class IriSubmitter(PluginBase):
         self.launcher = kwarg.get("launcher", None)
         if self.launcher is not None and self.launcher not in ("single", "mpirun", "srun", "aprun", "jsrun"):
             raise ValueError(f"Unsupported launcher '{self.launcher}'; must be one of single, mpirun, srun, aprun, jsrun")
-        
+
+        # Some IRI facility backends implement the job_spec.resources schema (per openapi.json)
+        # only partially and reject unsupported keys with HTTP 501 (e.g. ALCF's PBS-backed API
+        # has rejected process_count, then processes_per_node, one field at a time as it's rolled
+        # out). Let such fields be dropped from the submitted resources dict per queue config.
+        unsupported_resource_fields = kwarg.get("unsupported_resource_fields", None) or []
+        if isinstance(unsupported_resource_fields, str):
+            unsupported_resource_fields = unsupported_resource_fields.split(",")
+        self.unsupported_resource_fields = {field.strip() for field in unsupported_resource_fields if field.strip()}
+
         self.remote_executable = kwarg.get("remote_executable", None)
         if not self.remote_executable:
             raise ValueError("remote_executable must be specified in iri_submitter configuration")
@@ -212,10 +221,7 @@ class IriSubmitter(PluginBase):
                 "stderr_path": stderr_path,
                 "resources": {
                     "node_count": placeholder["nNode"],
-                    # process_count (node_count * processes_per_node) is omitted: some IRI
-                    # facility backends (e.g. ALCF's PBS-backed API) don't support it yet and
-                    # reject the job with HTTP 501. processes_per_node + node_count already
-                    # convey the process count.
+                    "process_count": placeholder["nNode"] * placeholder["nProcessPerNode"],
                     "processes_per_node": placeholder["nProcessPerNode"],
                     "cpu_cores_per_process": placeholder["nCorePerProcess"],
                     "exclusive_node_use": True,
@@ -235,6 +241,8 @@ class IriSubmitter(PluginBase):
             }
             if self.gpu_cores_per_process >= 1:
                 job_spec["resources"]["gpu_cores_per_process"] = self.gpu_cores_per_process
+            for field in self.unsupported_resource_fields:
+                job_spec["resources"].pop(field, None)
             custom_attributes = {}
             if getattr(self, "constraint", None) is not None:
                 custom_attributes["constraint"] = self.constraint

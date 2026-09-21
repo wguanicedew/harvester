@@ -212,7 +212,10 @@ class IriSubmitter(PluginBase):
                 "stderr_path": stderr_path,
                 "resources": {
                     "node_count": placeholder["nNode"],
-                    "process_count": placeholder["nNode"] * placeholder["nProcessPerNode"],
+                    # process_count (node_count * processes_per_node) is omitted: some IRI
+                    # facility backends (e.g. ALCF's PBS-backed API) don't support it yet and
+                    # reject the job with HTTP 501. processes_per_node + node_count already
+                    # convey the process count.
                     "processes_per_node": placeholder["nProcessPerNode"],
                     "cpu_cores_per_process": placeholder["nCorePerProcess"],
                     "exclusive_node_use": True,

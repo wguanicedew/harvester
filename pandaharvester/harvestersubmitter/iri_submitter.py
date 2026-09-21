@@ -225,7 +225,7 @@ class IriSubmitter(PluginBase):
                     "processes_per_node": placeholder["nProcessPerNode"],
                     "cpu_cores_per_process": placeholder["nCorePerProcess"],
                     "exclusive_node_use": True,
-                    "memory": int(placeholder["requestRamBytes"]) * placeholder["nCorePerNode"] * placeholder["nNode"] if placeholder["requestRamBytes"] else None,
+                    "memory": int(placeholder["requestRamBytesPerCore"]) * placeholder["nCorePerNode"] * placeholder["nNode"] if placeholder["requestRamBytesPerCore"] else None,
                     "additionalProp1": {},
                 },
                 "attributes": {

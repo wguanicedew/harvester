@@ -40,7 +40,9 @@
 			"TOREMOVE_remote_log_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
 			"remote_input_cache":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/input_cache",
 			"logBaseURL":"https://aipanda176.cern.ch/job_logs",
-			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_token.yaml"
+			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_access_token.yaml",
+			"upload_method": "globus_https",
+            "globus_upload_dir":"/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs"
 			},
 	"workerMaker":{
 			"name":"SimpleWorkerMaker",
@@ -65,7 +67,8 @@
 			"globus_https_config":"/opt/harvester/etc/panda/ALCF_CRUX_https_access_token.yaml",
 			"remote_work_dir":"/lus/eagle/projects/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs",
 			"download_logs":true,
-			"download_logs_method":"globus_https"
+			"download_logs_method":"globus_https",
+			"globus_download_dir": "/ATLAS_workflow_ALCF/usatlas/IRI_workdir/jobs"
 			},
 	"sweeper":{
 			"name":"IriSweeper",

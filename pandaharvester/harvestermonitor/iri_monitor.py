@@ -31,6 +31,20 @@ def _get_stdio_paths_from_job(job):
     return comment.get("stdoutPath"), comment.get("stderrPath")
 
 
+def _strip_globus_prefix(path, globus_download_dir):
+    """If path is "<prefix>/<globus_download_dir>/<file>", drop the prefix so the
+    result is relative to globus_download_dir, as needed by the Globus HTTPS
+    collection whose root differs from the batch scheduler's filesystem root.
+    Returns path unchanged if globus_download_dir isn't found in it.
+    """
+    if not path or not globus_download_dir:
+        return path
+    idx = path.find(globus_download_dir)
+    if idx == -1:
+        return path
+    return path[idx:]
+
+
 # monitor for IRI API
 class IriMonitor(PluginBase):
     # constructor
@@ -49,12 +63,20 @@ class IriMonitor(PluginBase):
 
         self.globus_https_config = None
         self.globus_client = None
+        self.globus_download_dir = None
         self.remote_export_path = None
         self.htaccess_username = None
         self.htaccess_password = None
 
         if self.download_logs_method == "globus_https":
             self.globus_https_config = kwarg.get("globus_https_config", None)
+            # IRI reports stdout/stderr paths through the HPC's full mounted filesystem path
+            # (e.g. under remote_work_dir/remote_log_dir), but the Globus HTTPS collection's
+            # root can be mapped to a different, unprefixed path for the same directory.
+            # globus_download_dir is that Globus-relative equivalent; when set, it's used both
+            # to build the remote log dir and to strip the filesystem prefix off paths reported
+            # by the job (see _strip_globus_prefix).
+            self.globus_download_dir = kwarg.get("globus_download_dir", None)
             if self.download_logs:
                 self.globus_client = GlobusClient(config_path=self.globus_https_config, debug=self.iri_debug)
         elif self.download_logs_method == "remote_export":
@@ -118,12 +140,17 @@ class IriMonitor(PluginBase):
 
             if newStatus in _TERMINAL_STATUSES and self.download_logs:
                 worker_id = str(workSpec.workerID)
-                if not self.remote_log_dir:
+                if self.download_logs_method == "globus_https" and self.globus_download_dir:
+                    remote_log_dir = os.path.join(self.globus_download_dir, worker_id)
+                elif not self.remote_log_dir:
                     remote_log_dir = os.path.join(self.remote_work_dir, worker_id)
                 else:
                     remote_log_dir = os.path.join(self.remote_log_dir, worker_id)
 
                 stdout_path, stderr_path = _get_stdio_paths_from_job(job)
+                if self.download_logs_method == "globus_https" and self.globus_download_dir:
+                    stdout_path = _strip_globus_prefix(stdout_path, self.globus_download_dir)
+                    stderr_path = _strip_globus_prefix(stderr_path, self.globus_download_dir)
                 remote_paths = {
                     f"{worker_id}_stdout.txt": stdout_path or os.path.join(remote_log_dir, f"{worker_id}_stdout.txt"),
                     f"{worker_id}_stderr.txt": stderr_path or os.path.join(remote_log_dir, f"{worker_id}_stderr.txt"),

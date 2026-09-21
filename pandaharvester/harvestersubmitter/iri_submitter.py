@@ -60,6 +60,11 @@ class IriSubmitter(PluginBase):
         if self.upload_method not in ("iri", "globus_https"):
             raise ValueError(f"Unsupported upload_method '{self.upload_method}'; must be 'iri' or 'globus_https'")
         self.globus_client = None
+        # IRI addresses files through the HPC's full mounted filesystem path (remote_work_dir),
+        # but the Globus HTTPS collection's root can be mapped to a different, unprefixed path
+        # for the same directory. globus_upload_dir is that Globus-relative equivalent of
+        # remote_work_dir, used instead of it when uploading via globus_https.
+        self.globus_upload_dir = kwarg.get("globus_upload_dir", None)
         if self.upload_method == "globus_https":
             self.globus_https_config = kwarg.get("globus_https_config", None)
             self.globus_client = GlobusClient(config_path=self.globus_https_config, debug=self.iri_debug)
@@ -158,9 +163,13 @@ class IriSubmitter(PluginBase):
                         continue
                     remote_path = os.path.join(remote_worker_dir, remote_name)
                     if self.upload_method == "globus_https":
-                        self.globus_client.upload(local_path, remote_path)
+                        if self.globus_upload_dir:
+                            remote_upload_path = os.path.join(self.globus_upload_dir, str(workSpec.workerID), remote_name)
+                        else:
+                            remote_upload_path = os.path.join(remote_worker_dir, remote_name)
+                        self.globus_client.upload(local_path, remote_upload_path)
                         if self.iri_debug:
-                            tmpLog.debug(f"Uploaded {local_path} to {remote_path} via Globus HTTPS")
+                            tmpLog.debug(f"Uploaded {local_path} to {remote_upload_path} via Globus HTTPS")
                     else:
                         ret = self.iri_client.upload(local_path, remote_path, resource_id=self.remote_work_dir_resource_id)
                         if self.iri_debug:

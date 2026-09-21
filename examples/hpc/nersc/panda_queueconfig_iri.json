@@ -43,7 +43,7 @@
 			"TOREMOVE_htaccess_password":"",
 			"logDir":"/data/atlpan/job_logs",
 			"logBaseURL":"https://aipanda176.cern.ch/job_logs",
-			"globus_https_config":"/opt/harvester/etc/panda/NERSC_https_token.yaml"
+			"globus_https_config":"/opt/harvester/etc/panda/NERSC_https_access_token.yaml"
 			},
 	"workerMaker":{
 			"name":"SimpleWorkerMaker",

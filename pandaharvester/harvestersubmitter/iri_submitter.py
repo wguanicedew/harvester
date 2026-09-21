@@ -42,6 +42,10 @@ class IriSubmitter(PluginBase):
         self.templateFile = kwarg.get("templateFile", None)
         self.remoteQueueName = kwarg.get("remoteQueueName", None)
         self.duration = kwarg.get("duration", None)
+        # None lets IRI run the executable directly, with no launcher wrapper (e.g. ALCF Polaris/Crux)
+        self.launcher = kwarg.get("launcher", None)
+        if self.launcher is not None and self.launcher not in ("single", "mpirun", "srun", "aprun", "jsrun"):
+            raise ValueError(f"Unsupported launcher '{self.launcher}'; must be one of single, mpirun, srun, aprun, jsrun")
         
         self.remote_executable = kwarg.get("remote_executable", None)
         if not self.remote_executable:
@@ -224,7 +228,7 @@ class IriSubmitter(PluginBase):
                 },
                 "pre_launch": getattr(self, "pre_launch", None),
                 "post_launch": getattr(self, "post_launch", None),
-                "launcher": getattr(self, "launcher", "srun"),  # single, mpirun, srun, aprun, jsrun
+                "launcher": self.launcher,  # single, mpirun, srun, aprun, jsrun
             }
             if self.gpu_cores_per_process >= 1:
                 job_spec["resources"]["gpu_cores_per_process"] = self.gpu_cores_per_process

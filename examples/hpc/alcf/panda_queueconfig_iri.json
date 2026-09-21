@@ -32,6 +32,7 @@
 			"duration":1800,
 			"constraint":"cpu",
 			"project":"ATLAS_workflow_ALCF",
+			"launcher":"pbs",
 			"remoteQueueName":"debug",
 			"custom_attributes": {"filesystems": "home:eagle"},
 			"templateFile":"/opt/harvester/sites/crux_iri_submit_template.sh",

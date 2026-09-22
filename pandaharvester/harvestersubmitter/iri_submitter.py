@@ -57,8 +57,6 @@ class IriSubmitter(PluginBase):
         self.unsupported_resource_fields = {field.strip() for field in unsupported_resource_fields if field.strip()}
 
         self.remote_executable = kwarg.get("remote_executable", None)
-        if not self.remote_executable:
-            raise ValueError("remote_executable must be specified in iri_submitter configuration")
         self.remote_work_dir = kwarg.get("remote_work_dir", None)
         self.remote_work_dir_resource_id = kwarg.get("remote_work_dir_resource_id", None)
         if not self.remote_work_dir:

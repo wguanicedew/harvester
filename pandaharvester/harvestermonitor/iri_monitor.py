@@ -167,11 +167,19 @@ class IriMonitor(PluginBase):
                     local_dest = local_paths.get(filename) or os.path.join(self.logDir, filename)
                     if os.path.exists(local_dest):
                         continue
-                    os.makedirs(os.path.dirname(local_dest), exist_ok=True)
+                    local_dest_dir = os.path.dirname(local_dest)
+                    try:
+                        os.makedirs(local_dest_dir, exist_ok=True)
+                        # the web server serving logDir needs search/read access regardless of harvester's umask
+                        os.chmod(local_dest_dir, 0o755)
+                    except OSError as e:
+                        # e.g. the fallback logDir is owned by another user; still try the download
+                        tmpLog.warning(f"failed to prepare local log directory {local_dest_dir}: {e}")
 
                     if self.download_logs_method == "globus_https":
                         try:
                             self.globus_client.download(remote_file_path, local_dest)
+                            os.chmod(local_dest, 0o644)
                             tmpLog.debug(f"downloaded {filename} via Globus HTTPS from {remote_file_path} to {local_dest}")
                         except (GlobusClientError, OSError) as e:
                             tmpLog.error(f"failed to download {filename} via Globus HTTPS from {remote_file_path} to {local_dest}: {e}")
@@ -179,6 +187,7 @@ class IriMonitor(PluginBase):
                         remote_url = f"{self.remote_export_path.rstrip('/')}/{worker_id}/{filename}"
                         try:
                             self.iri_client.download_from_http(remote_url, local_dest, username=self.htaccess_username, password=self.htaccess_password)
+                            os.chmod(local_dest, 0o644)
                             tmpLog.debug(f"downloaded {filename} from {remote_url} to {local_dest}")
                         except (IriClientError, OSError) as e:
                             tmpLog.error(f"failed to download {filename} from {remote_url} to {local_dest}: {e}")

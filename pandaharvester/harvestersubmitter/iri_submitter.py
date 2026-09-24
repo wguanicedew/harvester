@@ -30,8 +30,12 @@ class _TeeLogger:
 
     def _write(self, level, msg):
         try:
+            is_new = not os.path.exists(self.log_file)
             with open(self.log_file, "a") as f:
                 f.write(f"{core_utils.naive_utcnow().isoformat(sep=' ')} {level:<7} {msg}\n")
+            if is_new:
+                # make it readable by the web server serving logDir
+                os.chmod(self.log_file, 0o644)
         except Exception as e:
             self.logger.warning(f"failed to write to local log file {self.log_file}: {e}")
 
@@ -159,6 +163,8 @@ class IriSubmitter(PluginBase):
             date_str = core_utils.naive_utcnow().strftime("%y-%m-%d_%H")
             local_log_dir = os.path.join(self.logDir, date_str, str(workSpec.workerID))
             os.makedirs(local_log_dir, exist_ok=True)
+            # the web server serving logDir needs search/read access regardless of harvester's umask
+            os.chmod(local_log_dir, 0o755)
             # also write submission logs to a local file in local_log_dir
             local_log_file = os.path.join(local_log_dir, f"{workSpec.workerID}_submit.log")
             tmpLog = _TeeLogger(tmpLog, local_log_file)

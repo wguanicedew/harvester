@@ -156,10 +156,18 @@ class IriMonitor(PluginBase):
                     f"{worker_id}_stderr.txt": stderr_path or os.path.join(remote_log_dir, f"{worker_id}_stderr.txt"),
                 }
 
+                # local destinations recorded by the submitter, falling back to logDir
+                work_attrs = workSpec.workAttributes or {}
+                local_paths = {
+                    f"{worker_id}_stdout.txt": work_attrs.get("local_log_stdout"),
+                    f"{worker_id}_stderr.txt": work_attrs.get("local_log_stderr"),
+                }
+
                 for filename, remote_file_path in remote_paths.items():
-                    local_dest = os.path.join(self.logDir, filename)
+                    local_dest = local_paths.get(filename) or os.path.join(self.logDir, filename)
                     if os.path.exists(local_dest):
                         continue
+                    os.makedirs(os.path.dirname(local_dest), exist_ok=True)
 
                     if self.download_logs_method == "globus_https":
                         try:

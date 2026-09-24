@@ -1,6 +1,5 @@
 import os
 import stat
-import tempfile
 from math import ceil
 
 from pandaharvester.harvesterconfig import harvester_config
@@ -20,6 +19,37 @@ def _mask_command(ret):
         masked["command"] = "<omitted>"
         return masked
     return ret
+
+
+class _TeeLogger:
+    """Forward log calls to a harvester logger and also append them to a local file."""
+
+    def __init__(self, logger, log_file):
+        self.logger = logger
+        self.log_file = log_file
+
+    def _write(self, level, msg):
+        try:
+            with open(self.log_file, "a") as f:
+                f.write(f"{core_utils.naive_utcnow().isoformat(sep=' ')} {level:<7} {msg}\n")
+        except Exception as e:
+            self.logger.warning(f"failed to write to local log file {self.log_file}: {e}")
+
+    def debug(self, msg):
+        self.logger.debug(msg)
+        self._write("DEBUG", msg)
+
+    def info(self, msg):
+        self.logger.info(msg)
+        self._write("INFO", msg)
+
+    def warning(self, msg):
+        self.logger.warning(msg)
+        self._write("WARNING", msg)
+
+    def error(self, msg):
+        self.logger.error(msg)
+        self._write("ERROR", msg)
 
 
 # submitter for IRI API
@@ -126,11 +156,17 @@ class IriSubmitter(PluginBase):
         for workSpec in workspec_list:
             # make logger
             tmpLog = self.make_logger(baseLogger, f"workerID={workSpec.workerID}", method_name="submit_workers")
+            date_str = core_utils.naive_utcnow().strftime("%y-%m-%d")
+            local_log_dir = os.path.join(self.logDir, date_str, str(workSpec.workerID))
+            os.makedirs(local_log_dir, exist_ok=True)
+            # also write submission logs to a local file in local_log_dir
+            local_log_file = os.path.join(local_log_dir, f"{workSpec.workerID}_submit.log")
+            tmpLog = _TeeLogger(tmpLog, local_log_file)
             # make batch script, here we create batch script at where harvester install
             placeholder = self.make_placeholder_map(workSpec, tmpLog)
             # set nCore to the total core count across all nodes
             workSpec.nCore = placeholder["nCorePerNode"] * placeholder["nNode"]
-            batchFile = self.make_batch_script(workSpec, placeholder, tmpLog)
+            batchFile = self.make_batch_script(workSpec, placeholder, local_log_dir, tmpLog)
             remote_worker_dir = os.path.join(self.remote_work_dir, str(workSpec.workerID))
             if self.duration:
                 duration = self.duration
@@ -279,6 +315,21 @@ class IriSubmitter(PluginBase):
                 retList.append((False, err))
                 continue
 
+            # local_log_stdout and local_log_stderr are the local paths where the monitor downloads
+            # the stdout/stderr to; record them in the workspec so the monitor can find them
+            local_log_stdout = os.path.join(local_log_dir, f"{workSpec.workerID}_stdout.txt")
+            local_log_stderr = os.path.join(local_log_dir, f"{workSpec.workerID}_stderr.txt")
+            workSpec.set_work_attributes({"local_log_stdout": local_log_stdout, "local_log_stderr": local_log_stderr})
+            if self.logBaseURL:
+                # logs are fetched back into local_log_dir, publish them under logBaseURL
+                log_stdOut = self.logBaseURL + local_log_stdout.replace(self.logDir, "")
+                log_stdErr = self.logBaseURL + local_log_stderr.replace(self.logDir, "")
+                log_batch = self.logBaseURL + batchFile.replace(self.logDir, "")
+                log_tee = self.logBaseURL + local_log_file.replace(self.logDir, "")
+                workSpec.set_log_file("stdout", log_stdOut)
+                workSpec.set_log_file("stderr", log_stdErr)
+                workSpec.set_log_file("jdl", log_batch)
+                workSpec.set_log_file("batchlog", log_tee)
             remote_export_path = self.remote_export_path.rstrip("/") if self.remote_export_path else None
             if remote_export_path:
                 rel_stdOut = f"{workSpec.workerID}/stdout.txt"
@@ -287,6 +338,8 @@ class IriSubmitter(PluginBase):
                 log_stdErr = os.path.join(remote_export_path, rel_stdErr)
                 workSpec.set_log_file("stdout", log_stdOut)
                 workSpec.set_log_file("stderr", log_stdErr)
+                # workSpec.set_log_file("jdl", log_stdOut)
+                # workSpec.set_log_file("batchlog", log_stdErr)
 
             tmpLog.debug(f"Assigned batchID: {job_id}")
             workSpec.batchID = job_id
@@ -415,18 +468,18 @@ class IriSubmitter(PluginBase):
         return placeholder_map
 
     # make batch script
-    def make_batch_script(self, workspec, placeholder, logger):
+    def make_batch_script(self, workspec, placeholder, local_log_dir, logger):
         # template for batch script
         with open(self.templateFile) as f:
             template = f.read()
-        tmpFile = tempfile.NamedTemporaryFile(delete=False, suffix="_submit.sh", dir=workspec.get_access_point())
-        tmpFile.write(str(template.format_map(core_utils.SafeDict(placeholder))).encode("latin_1"))
-        tmpFile.close()
+        batch_file = os.path.join(local_log_dir, f"{workspec.workerID}_submit.sh")
+        with open(batch_file, "wb") as f:
+            f.write(str(template.format_map(core_utils.SafeDict(placeholder))).encode("latin_1"))
         if self.iri_debug:
-            logger.debug(f"Rendered batch script {tmpFile.name} from template {self.templateFile}")
+            logger.debug(f"Rendered batch script {batch_file} from template {self.templateFile}")
 
-        # set execution bit and group permissions on the temp file
-        st = os.stat(tmpFile.name)
-        os.chmod(tmpFile.name, st.st_mode | stat.S_IEXEC | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
+        # set execution bit and group permissions on the batch script
+        st = os.stat(batch_file)
+        os.chmod(batch_file, st.st_mode | stat.S_IEXEC | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)
 
-        return tmpFile.name
+        return batch_file

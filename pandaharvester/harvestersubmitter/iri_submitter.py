@@ -156,7 +156,7 @@ class IriSubmitter(PluginBase):
         for workSpec in workspec_list:
             # make logger
             tmpLog = self.make_logger(baseLogger, f"workerID={workSpec.workerID}", method_name="submit_workers")
-            date_str = core_utils.naive_utcnow().strftime("%y-%m-%d")
+            date_str = core_utils.naive_utcnow().strftime("%y-%m-%d_%H")
             local_log_dir = os.path.join(self.logDir, date_str, str(workSpec.workerID))
             os.makedirs(local_log_dir, exist_ok=True)
             # also write submission logs to a local file in local_log_dir

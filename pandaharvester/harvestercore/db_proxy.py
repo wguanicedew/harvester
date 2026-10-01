@@ -1089,6 +1089,7 @@ class DBProxy(object):
             varMap[":timeLimit"] = timeNow - datetime.timedelta(seconds=interval)
             self.execute(sqlQ, varMap)
             resQ = self.cur.fetchall()
+            tmpLog.debug(f"got {len(resQ)} queues with jobFetchTime before {varMap[':timeLimit']}: {[q for (q,) in resQ]}")
             i_queues = 0
             for (queue_name,) in resQ:
                 # update timestamp to lock the queue
@@ -1102,6 +1103,7 @@ class DBProxy(object):
                 self.commit()
                 # skip if not locked
                 if nRow == 0:
+                    tmpLog.debug(f"{queue_name} skipped since failed to lock")
                     continue
                 # count nQueue
                 varMap = dict()
@@ -1116,6 +1118,7 @@ class DBProxy(object):
                 for status, cnt, corecount in resN:
                     job_stats_map[status]["n"] = cnt
                     job_stats_map[status]["core"] = corecount
+                tmpLog.debug(f"{queue_name} job stats: {job_stats_map}")
                 # get job limit attributes from queue config
                 queue_config = queue_config_mapper.get_queue(queue_name)
                 nQueueLimitJob = getattr(queue_config, "nQueueLimitJob", None)
@@ -1126,7 +1129,12 @@ class DBProxy(object):
                 nQueueLimitJobCoresMin = getattr(queue_config, "nQueueLimitJobCoresMin", None)
                 # skip the queue if nQueueLimitJob is None (not PUSH)
                 if nQueueLimitJob is None:
+                    tmpLog.debug(f"{queue_name} skipped since nQueueLimitJob is None (not PUSH)")
                     continue
+                tmpLog.debug(
+                    f"{queue_name} nQueueLimitJob={nQueueLimitJob} nQueueLimitJobRatio={nQueueLimitJobRatio} nQueueLimitJobMin={nQueueLimitJobMin} "
+                    f"nQueueLimitJobCores={nQueueLimitJobCores} nQueueLimitJobCoresRatio={nQueueLimitJobCoresRatio} nQueueLimitJobCoresMin={nQueueLimitJobCoresMin}"
+                )
                 # initialize
                 n_queue_limit_job_eval = nQueueLimitJob
                 n_queue_limit_job_cores_eval = nQueueLimitJobCores
